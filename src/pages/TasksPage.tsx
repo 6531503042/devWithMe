@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AppNavbar from '@/components/layout/AppNavbar';
@@ -213,7 +212,8 @@ const TasksPage = () => {
         description: newTask.description,
         type: newTask.type,
         category: newTask.category,
-        due_date: newTask.dueDate,
+        // Convert Date object to ISO string format for Supabase
+        due_date: newTask.dueDate ? newTask.dueDate.toISOString() : undefined,
         completed: newTask.completed,
         numeric_goal_current: newTask.numericGoal?.current,
         numeric_goal_target: newTask.numericGoal?.target,
