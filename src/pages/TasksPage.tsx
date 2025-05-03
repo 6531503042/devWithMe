@@ -12,6 +12,12 @@ import TaskForm from '@/components/tasks/TaskForm';
 // Define the TaskType and Task interface to ensure type safety
 type TaskType = 'task' | 'habit' | 'recurring';
 
+interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -20,6 +26,22 @@ interface Task {
   type: TaskType;
   category?: string;
   dueDate?: Date;
+  // Enhanced tracking features
+  numericGoal?: {
+    current: number;
+    target: number;
+    unit?: string;
+  };
+  timerGoal?: {
+    duration: number; // in minutes
+    elapsed?: number;
+  };
+  checklist?: {
+    items: ChecklistItem[];
+  };
+  streak?: number;
+  bestStreak?: number;
+  lastCompleted?: Date;
 }
 
 const TasksPage = () => {
@@ -39,7 +61,13 @@ const TasksPage = () => {
       description: '30-minute exercise routine',
       completed: false,
       type: 'habit',
-      category: 'health'
+      category: 'health',
+      streak: 3,
+      bestStreak: 7,
+      timerGoal: {
+        duration: 30,
+        elapsed: 20
+      }
     },
     {
       id: '3',
@@ -57,6 +85,39 @@ const TasksPage = () => {
       completed: false,
       type: 'task',
       category: 'coding'
+    },
+    {
+      id: '5',
+      title: 'Drink water',
+      description: '8 glasses per day',
+      completed: false,
+      type: 'habit',
+      category: 'health',
+      numericGoal: {
+        current: 5,
+        target: 8,
+        unit: 'glasses'
+      },
+      streak: 2,
+      bestStreak: 5
+    },
+    {
+      id: '6',
+      title: 'Read book',
+      description: 'Continue reading "Clean Code"',
+      completed: false,
+      type: 'habit',
+      category: 'education',
+      checklist: {
+        items: [
+          { id: 'c1', text: 'Chapter 1', done: true },
+          { id: 'c2', text: 'Chapter 2', done: true },
+          { id: 'c3', text: 'Chapter 3', done: false },
+          { id: 'c4', text: 'Chapter 4', done: false }
+        ]
+      },
+      streak: 4,
+      bestStreak: 4
     }
   ]);
   
@@ -64,13 +125,106 @@ const TasksPage = () => {
   const [activeTab, setActiveTab] = useState<'all' | TaskType>('all');
   
   const handleTaskComplete = (id: string, completed: boolean) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        // Update streak if it's a habit
+        let newStreak = task.streak;
+        let bestStreak = task.bestStreak;
+        
+        if (task.type === 'habit') {
+          if (completed) {
+            // Increment streak when completed
+            newStreak = (task.streak || 0) + 1;
+            // Update best streak if current streak exceeds it
+            bestStreak = Math.max(newStreak, task.bestStreak || 0);
+          } else if (task.completed) {
+            // Decrement streak if unchecking
+            newStreak = Math.max((task.streak || 0) - 1, 0);
+          }
+        }
+        
+        return { 
+          ...task, 
+          completed,
+          streak: newStreak,
+          bestStreak,
+          lastCompleted: completed ? new Date() : task.lastCompleted
+        };
+      }
+      return task;
+    }));
   };
   
   const handleAddTask = (newTask: Task) => {
     setTasks([...tasks, newTask]);
+  };
+  
+  const handleNumericUpdate = (id: string, value: number) => {
+    setTasks(tasks.map(task => {
+      if (task.id === id && task.numericGoal) {
+        const updatedGoal = {
+          ...task.numericGoal,
+          current: value
+        };
+        
+        // Mark as completed if the goal is reached
+        const completed = value >= task.numericGoal.target;
+        
+        return {
+          ...task,
+          numericGoal: updatedGoal,
+          completed: completed
+        };
+      }
+      return task;
+    }));
+  };
+  
+  const handleTimerUpdate = (id: string, elapsed: number) => {
+    setTasks(tasks.map(task => {
+      if (task.id === id && task.timerGoal) {
+        const updatedGoal = {
+          ...task.timerGoal,
+          elapsed
+        };
+        
+        // Mark as completed if the goal is reached
+        const completed = elapsed >= task.timerGoal.duration;
+        
+        return {
+          ...task,
+          timerGoal: updatedGoal,
+          completed: completed
+        };
+      }
+      return task;
+    }));
+  };
+  
+  const handleChecklistUpdate = (id: string, itemId: string, done: boolean) => {
+    setTasks(tasks.map(task => {
+      if (task.id === id && task.checklist) {
+        // Update the checklist item
+        const updatedItems = task.checklist.items.map(item => {
+          if (item.id === itemId) {
+            return { ...item, done };
+          }
+          return item;
+        });
+        
+        // Check if all checklist items are completed
+        const allCompleted = updatedItems.every(item => item.done);
+        
+        return {
+          ...task,
+          checklist: {
+            items: updatedItems
+          },
+          completed: allCompleted
+        };
+      }
+      return task;
+    }));
   };
   
   const filteredTasks = tasks.filter(task => {
@@ -107,6 +261,9 @@ const TasksPage = () => {
                   key={task.id} 
                   task={task}
                   onComplete={handleTaskComplete}
+                  onNumericUpdate={handleNumericUpdate}
+                  onTimerUpdate={handleTimerUpdate}
+                  onChecklistUpdate={handleChecklistUpdate}
                 />
               ))
             ) : (
