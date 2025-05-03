@@ -7,7 +7,7 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   description?: string;
-  data?: any[];
+  data?: { name: string; value: number }[];
   chartType?: 'bar' | 'none';
 }
 

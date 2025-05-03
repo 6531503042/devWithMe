@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
@@ -8,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, devMode } = useAuth();
 
   if (loading) {
     return (
@@ -20,7 +19,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (!user) {
+  // Allow access in development mode even without authentication
+  if (!user && !devMode) {
     return <Navigate to="/auth" replace />;
   }
 
