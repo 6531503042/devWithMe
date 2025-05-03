@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, ListChecks, BarChart } from 'lucide-react';
+import { CheckCircle, Clock, ListChecks, BarChart, Mail, Lock, ArrowRight } from 'lucide-react';
 
 const AuthPage = () => {
   const [email, setEmail] = useState('');
@@ -117,131 +117,172 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Left side - Hero section */}
-      <div className="w-full md:w-1/2 bg-gradient-to-br from-primary/90 to-purple-700 text-white p-8 md:p-12 flex flex-col justify-center">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">Welcome to SparkHub</h1>
-          <p className="text-lg md:text-xl mb-8 text-white/90">
-            Your all-in-one productivity solution for managing tasks, tracking habits, and staying focused.
-          </p>
-          
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-6 h-6" />
-                <h3 className="font-semibold">Task Management</h3>
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+      {/* Hero Header */}
+      <header className="container mx-auto pt-10 pb-6 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          SparkHub
+        </h1>
+        <p className="text-lg mt-2 text-muted-foreground max-w-xl mx-auto">
+          Your all-in-one productivity solution for getting more done
+        </p>
+      </header>
+      
+      <div className="container mx-auto px-4 flex flex-col-reverse lg:flex-row gap-12 lg:gap-20 items-center py-8">
+        {/* Left side - Hero features */}
+        <div className="w-full lg:w-3/5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-card rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/50">
+              <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+                <CheckCircle className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-sm text-white/80">Organize and track your tasks with ease</p>
+              <h3 className="text-xl font-semibold mb-2">Task Management</h3>
+              <p className="text-muted-foreground">Organize, prioritize, and track all your tasks in one place. Stay on top of deadlines and never miss important work.</p>
             </div>
             
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-6 h-6" />
-                <h3 className="font-semibold">Pomodoro Timer</h3>
+            <div className="bg-card rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/50">
+              <div className="rounded-full bg-indigo-500/10 w-12 h-12 flex items-center justify-center mb-4">
+                <Clock className="w-6 h-6 text-indigo-500" />
               </div>
-              <p className="text-sm text-white/80">Stay focused with timed work sessions</p>
+              <h3 className="text-xl font-semibold mb-2">Pomodoro Timer</h3>
+              <p className="text-muted-foreground">Boost productivity using the proven Pomodoro technique with customizable work and break intervals.</p>
             </div>
             
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <ListChecks className="w-6 h-6" />
-                <h3 className="font-semibold">Habit Tracking</h3>
+            <div className="bg-card rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/50">
+              <div className="rounded-full bg-amber-500/10 w-12 h-12 flex items-center justify-center mb-4">
+                <ListChecks className="w-6 h-6 text-amber-500" />
               </div>
-              <p className="text-sm text-white/80">Build better habits with daily tracking</p>
+              <h3 className="text-xl font-semibold mb-2">Habit Tracking</h3>
+              <p className="text-muted-foreground">Build lasting habits with daily tracking, streaks, and visual progress indicators that keep you motivated.</p>
             </div>
             
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <BarChart className="w-6 h-6" />
-                <h3 className="font-semibold">Analytics</h3>
+            <div className="bg-card rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/50">
+              <div className="rounded-full bg-green-500/10 w-12 h-12 flex items-center justify-center mb-4">
+                <BarChart className="w-6 h-6 text-green-500" />
               </div>
-              <p className="text-sm text-white/80">Visualize your productivity patterns</p>
+              <h3 className="text-xl font-semibold mb-2">Analytics</h3>
+              <p className="text-muted-foreground">Gain insights into your productivity with beautiful charts and metrics that help optimize your workflow.</p>
             </div>
           </div>
         </div>
+        
+        {/* Right side - Auth form */}
+        <div className="w-full lg:w-2/5">
+          <Card className="backdrop-blur-sm bg-card/90 border border-border/50 shadow-xl rounded-xl p-1">
+            <CardContent className="p-6">
+              <Tabs defaultValue={tab} onValueChange={(value) => setTab(value as 'login' | 'signup')} className="w-full">
+                <TabsList className="grid grid-cols-2 w-full mb-8 rounded-md p-1 h-auto">
+                  <TabsTrigger value="login" className="text-sm md:text-base py-2.5 rounded-l-md">Login</TabsTrigger>
+                  <TabsTrigger value="signup" className="text-sm md:text-base py-2.5 rounded-r-md">Sign Up</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login">
+                  <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email-login" className="text-sm font-medium">Email address</Label>
+                        <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 pointer-events-none" />
+                      <Input
+                        id="email-login"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="pl-10 h-11 rounded-md border border-input bg-background/80 text-sm focus:border-primary focus-visible:ring-1 focus-visible:ring-primary transition-all"
+                      />
+                    </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="password-login" className="text-sm font-medium">Password</Label>
+                          <a href="#" className="text-xs text-primary hover:underline">Forgot password?</a>
+                        </div>
+                        <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 pointer-events-none" />
+                        <Input
+                          id="password-login"
+                          type="password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="pl-10 h-11 rounded-md border border-input bg-background/80 text-sm focus:border-primary focus-visible:ring-1 focus-visible:ring-primary transition-all"
+                        />
+                      </div>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 text-base font-medium rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-md hover:shadow-lg" 
+                      disabled={loading}
+                    >
+                      {loading ? "Logging in..." : "Login to Your Account"}
+                      {!loading && <ArrowRight className="ml-2 h-5 w-5" />}
+                    </Button>
+                  </form>
+                </TabsContent>
+                
+                <TabsContent value="signup">
+                  <form onSubmit={handleSignup} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email-signup" className="text-sm font-medium">Email address</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 pointer-events-none" />
+                          <Input 
+                            id="email-signup"
+                            type="email" 
+                            placeholder="you@example.com"
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            required 
+                            className="pl-10 h-11 rounded-md border border-input bg-background/80 text-sm focus:border-primary focus-visible:ring-1 focus-visible:ring-primary transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password-signup" className="text-sm font-medium">Password</Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 pointer-events-none" />
+                          <Input 
+                            id="password-signup"
+                            type="password" 
+                            placeholder="Min. 6 characters"
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            required
+                            className="pl-10 h-11 rounded-md border border-input bg-background/80 text-sm focus:border-primary focus-visible:ring-1 focus-visible:ring-primary transition-all"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Password must be at least 6 characters long</p>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 text-base font-medium rounded-lg bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-md hover:shadow-lg" 
+                      disabled={loading}
+                    >
+                      {loading ? "Creating Account..." : "Create Free Account"}
+                      {!loading && <ArrowRight className="ml-2 h-5 w-5" />}
+                    </Button>
+                    
+                    <p className="text-center text-xs text-muted-foreground mt-4">
+                      By creating an account, you agree to our
+                      <br />
+                      <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+                    </p>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
       </div>
       
-      {/* Right side - Auth form */}
-      <div className="w-full md:w-1/2 bg-background p-8 md:p-12 flex items-center justify-center">
-        <Card className="w-full max-w-md border-none shadow-none">
-          <Tabs value={tab} onValueChange={(value) => setTab(value as 'login' | 'signup')} className="w-full">
-            <TabsList className="grid grid-cols-2 w-full mb-8">
-              <TabsTrigger value="login" className="text-lg">Login</TabsTrigger>
-              <TabsTrigger value="signup" className="text-lg">Sign Up</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-base">Email</Label>
-                    <Input 
-                      id="login-email" 
-                      type="email" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      required 
-                      placeholder="name@example.com"
-                      className="h-12 text-base"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-base">Password</Label>
-                    <Input 
-                      id="login-password" 
-                      type="password" 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      required
-                      className="h-12 text-base"
-                    />
-                  </div>
-                </div>
-                
-                <Button type="submit" className="w-full h-12 text-base" size="lg" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-base">Email</Label>
-                    <Input 
-                      id="signup-email" 
-                      type="email" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      required 
-                      placeholder="name@example.com"
-                      className="h-12 text-base"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-base">Password</Label>
-                    <Input 
-                      id="signup-password" 
-                      type="password" 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      required
-                      placeholder="Min. 6 characters"
-                      className="h-12 text-base"
-                    />
-                  </div>
-                </div>
-                
-                <Button type="submit" className="w-full h-12 text-base" size="lg" disabled={loading}>
-                  {loading ? "Creating Account..." : "Create Account"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </Card>
-      </div>
     </div>
   );
 };

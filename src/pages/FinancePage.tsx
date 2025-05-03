@@ -20,103 +20,18 @@ type Transaction = Database['public']['Tables']['transactions']['Row'] & {
   transaction_categories?: {
     name: string;
     type: string;
+    icon: string | null;
+    color: string | null;
   } | null;
 };
 type Budget = Database['public']['Tables']['budgets']['Row'];
 type TransactionCategory = Database['public']['Tables']['transaction_categories']['Row'];
 
-// Mock data for development mode
-const mockAccounts: FinancialAccount[] = [
-  {
-    id: '1',
-    name: 'Main Checking',
-    balance: 2540.75,
-    currency: 'USD',
-    type: 'bank',
-    icon: null,
-    color: null,
-    is_active: true,
-    user_id: 'dev-user',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    name: 'Savings',
-    balance: 12750.00,
-    currency: 'USD',
-    type: 'bank',
-    icon: null,
-    color: null,
-    is_active: true,
-    user_id: 'dev-user',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
-
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    user_id: 'dev-user',
-    account_id: '1',
-    amount: -45.99,
-    type: 'expense',
-    category_id: '1',
-    date: new Date().toISOString(),
-    note: 'Groceries',
-    tags: ['food', 'essentials'],
-    image_url: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    transaction_categories: { name: 'Groceries', type: 'expense' }
-  },
-  {
-    id: '2',
-    user_id: 'dev-user',
-    account_id: '1',
-    amount: 1250.00,
-    type: 'income',
-    category_id: '2',
-    date: new Date().toISOString(),
-    note: 'Salary',
-    tags: ['income', 'work'],
-    image_url: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    transaction_categories: { name: 'Salary', type: 'income' }
-  }
-];
-
-const mockCategories: TransactionCategory[] = [
-  {
-    id: '1',
-    name: 'Groceries',
-    type: 'expense',
-    icon: '🍎',
-    color: '#ef4444',
-    is_system: true,
-    parent_id: null,
-    user_id: null,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    name: 'Salary',
-    type: 'income',
-    icon: '💼',
-    color: '#10b981',
-    is_system: true,
-    parent_id: null,
-    user_id: null,
-    created_at: new Date().toISOString()
-  }
-];
-
+// Color palette for charts
 const COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
 
 const FinancePage = () => {
-  const { user, devMode } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -130,22 +45,17 @@ const FinancePage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchAll();
-    } else if (devMode) {
-      // Use mock data in development mode
-      setAccounts(mockAccounts);
-      setTransactions(mockTransactions);
-      setCategories(mockCategories);
-      setBudgets([]);
-      setSelectedAccountId(mockAccounts[0].id);
-      setIsLoading(false);
-    }
-  }, [user, devMode]);
+    fetchAll();
+  }, [user]);
 
   const fetchAll = async () => {
     setIsLoading(true);
     try {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
       // Accounts
       const { data: accData, error: accErr } = await supabase
         .from('financial_accounts')
@@ -155,14 +65,16 @@ const FinancePage = () => {
       if (accErr) throw accErr;
       setAccounts(accData || []);
       if (accData && accData.length > 0 && !selectedAccountId) setSelectedAccountId(accData[0].id);
+      
       // Transactions
       const { data: txData, error: txErr } = await supabase
         .from('transactions')
-        .select('*, transaction_categories(name, type)')
+        .select('*, transaction_categories(name, type, icon, color)')
         .eq('user_id', user.id)
         .order('date', { ascending: false });
       if (txErr) throw txErr;
       setTransactions(txData || []);
+      
       // Budgets
       const { data: budData, error: budErr } = await supabase
         .from('budgets')
@@ -171,29 +83,22 @@ const FinancePage = () => {
         .order('created_at');
       if (budErr) throw budErr;
       setBudgets(budData || []);
+      
       // Categories
       const { data: catData, error: catErr } = await supabase
         .from('transaction_categories')
         .select('*')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},is_system.eq.true`)
         .order('name');
       if (catErr) throw catErr;
       setCategories(catData || []);
     } catch (error) {
       console.error('Error fetching finance data:', error);
-      
-      if (devMode) {
-        // Use mock data if fetch fails in development mode
-        setAccounts(mockAccounts);
-        setTransactions(mockTransactions);
-        setCategories(mockCategories);
-        setBudgets([]);
-        if (!selectedAccountId && mockAccounts.length > 0) {
-          setSelectedAccountId(mockAccounts[0].id);
-        }
-      } else {
-        toast({ title: 'Error', description: 'Failed to load finance data', variant: 'destructive' });
-      }
+      toast({
+        title: 'Error',
+        description: 'Failed to load finance data',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -202,37 +107,7 @@ const FinancePage = () => {
   // Add Account
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAccountName.trim()) return;
-    
-    if (devMode && !user) {
-      // In development mode without a user, just add to local state
-      const newAccount: FinancialAccount = {
-        id: Date.now().toString(),
-        name: newAccountName.trim(),
-        type: newAccountType,
-        currency: newAccountCurrency,
-        balance: 0,
-        is_active: true,
-        icon: null,
-        color: null,
-        user_id: 'dev-user',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      setAccounts(prev => [...prev, newAccount]);
-      setNewAccountName('');
-      setNewAccountType('cash');
-      setNewAccountCurrency('USD');
-      setIsAddAccountOpen(false);
-      
-      if (!selectedAccountId) {
-        setSelectedAccountId(newAccount.id);
-      }
-      
-      toast({ title: 'Account added (Dev Mode)' });
-      return;
-    }
+    if (!newAccountName.trim() || !user) return;
     
     try {
       const { error } = await supabase
@@ -242,6 +117,7 @@ const FinancePage = () => {
           type: newAccountType,
           currency: newAccountCurrency,
           user_id: user.id,
+          balance: 0,
         });
       if (error) throw error;
       setNewAccountName('');
@@ -251,7 +127,11 @@ const FinancePage = () => {
       fetchAll();
       toast({ title: 'Account added' });
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to add account', variant: 'destructive' });
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to add account', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -290,12 +170,41 @@ const FinancePage = () => {
       minimumFractionDigits: 2
     }).format(amount);
   };
+  
   const formatDate = (date: string) => {
     return new Intl.DateTimeFormat('en-US').format(new Date(date));
   };
 
   if (isLoading) {
-    return <div className="flex flex-col min-h-screen"><AppNavbar /><main className="flex-1"><PageContainer title="Finance Tracker"><div className="py-10 text-center">Loading...</div></PageContainer></main><AppFooter /></div>;
+    return (
+      <div className="flex flex-col min-h-screen">
+        <AppNavbar />
+        <main className="flex-1">
+          <PageContainer title="Finance Tracker">
+            <div className="py-10 text-center">Loading...</div>
+          </PageContainer>
+        </main>
+        <AppFooter />
+      </div>
+    );
+  }
+
+  // User is not logged in
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <AppNavbar />
+        <main className="flex-1">
+          <PageContainer title="Finance Tracker">
+            <div className="py-10 text-center">
+              <h2 className="text-xl font-semibold mb-2">Please log in</h2>
+              <p className="text-muted-foreground">You need to be logged in to use the Finance Tracker.</p>
+            </div>
+          </PageContainer>
+        </main>
+        <AppFooter />
+      </div>
+    );
   }
 
   return (
@@ -358,13 +267,25 @@ const FinancePage = () => {
                     {filteredTx.slice(0, 5).map((transaction) => (
                       <div key={transaction.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                         <div>
-                          <div className="font-medium capitalize">{transaction.transaction_categories?.name || 'Other'}</div>
+                          <div className="font-medium capitalize flex items-center gap-1.5">
+                            {transaction.transaction_categories?.icon && (
+                              <span style={{ color: transaction.transaction_categories.color || undefined }}>
+                                {transaction.transaction_categories.icon}
+                              </span>
+                            )}
+                            {transaction.transaction_categories?.name || 'Other'}
+                          </div>
                           <div className="text-sm text-muted-foreground">{formatDate(transaction.date)}</div>
                           {transaction.note && <div className="text-xs text-muted-foreground mt-1">{transaction.note}</div>}
                         </div>
                         <div className={`font-medium ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>{transaction.type === 'income' ? '+' : '-'} {formatCurrency(Math.abs(transaction.amount))}</div>
                       </div>
                     ))}
+                    {filteredTx.length === 0 && (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No transactions found
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -378,15 +299,21 @@ const FinancePage = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData}>
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`${formatCurrency(value as number)}`, '']} />
-                      <Bar dataKey="income" name="Income" fill="#8B5CF6" />
-                      <Bar dataKey="expense" name="Expense" fill="#EF4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {monthlyData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyData}>
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => [`${formatCurrency(value as number)}`, '']} />
+                        <Bar dataKey="income" name="Income" fill="#10b981" />
+                        <Bar dataKey="expense" name="Expense" fill="#ef4444" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No data available
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -396,23 +323,29 @@ const FinancePage = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieChartData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {pieChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieChartData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="value"
+                          nameKey="name"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {pieChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No expense data available
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -471,7 +404,6 @@ const FinancePage = () => {
           </Dialog>
         </PageContainer>
       </main>
-      <AppFooter />
     </div>
   );
 };

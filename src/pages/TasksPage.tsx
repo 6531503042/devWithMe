@@ -699,8 +699,7 @@ const TasksPage = () => {
           />
         </PageContainer>
       </main>
-      
-      <AppFooter />
+        
     </div>
   );
 };

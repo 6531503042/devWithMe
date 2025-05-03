@@ -110,7 +110,6 @@ const KanbanPage = () => {
 
           {selectedBoardId ? (
             <KanbanBoard 
-              onAddCard={() => setIsDialogOpen(true)} 
               boardId={selectedBoardId} 
             />
           ) : (

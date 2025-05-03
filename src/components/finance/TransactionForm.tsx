@@ -4,32 +4,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar as CalendarIcon, DollarSign, Hash } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
-interface TransactionCategory {
-  id: string;
-  name: string;
-  type: string;
-  icon: string | null;
-  color: string | null;
-}
-
-// Mock categories for development mode
-const mockCategories: Record<string, TransactionCategory[]> = {
-  expense: [
-    { id: '1', name: 'Groceries', type: 'expense', icon: '🍎', color: '#ef4444' },
-    { id: '2', name: 'Dining Out', type: 'expense', icon: '🍽️', color: '#f97316' },
-    { id: '3', name: 'Transport', type: 'expense', icon: '🚗', color: '#3b82f6' },
-    { id: '4', name: 'Bills', type: 'expense', icon: '📃', color: '#a855f7' }
-  ],
-  income: [
-    { id: '5', name: 'Salary', type: 'income', icon: '💼', color: '#10b981' },
-    { id: '6', name: 'Freelance', type: 'income', icon: '💻', color: '#0ea5e9' },
-    { id: '7', name: 'Gifts', type: 'income', icon: '🎁', color: '#ec4899' }
-  ]
-};
+type TransactionCategory = Database['public']['Tables']['transaction_categories']['Row'];
 
 interface TransactionFormProps {
   accountId: string;
@@ -41,6 +27,8 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
   const [type, setType] = useState('expense');
   const [categoryId, setCategoryId] = useState('');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState<Date>(new Date());
+  const [tags, setTags] = useState('');
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, devMode } = useAuth();
@@ -51,66 +39,53 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
   }, [type]);
 
   const fetchCategories = async () => {
-    // Use mock categories in development mode
-    if (devMode && !user) {
-      setCategories(mockCategories[type] || []);
-      return;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('transaction_categories')
         .select('*')
         .eq('type', type)
+        .or(`user_id.eq.${user?.id},is_system.eq.true`)
         .order('name');
 
       if (error) throw error;
       
       if (data && data.length > 0) {
         setCategories(data);
+        // Set default category if available
+        if (!categoryId && data.length > 0) {
+          setCategoryId(data[0].id);
+        }
       } else {
-        // Use mock categories as fallback
-        setCategories(mockCategories[type] || []);
+        // If no categories are found, clear the selection
+        setCategoryId('');
+        setCategories([]);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      
-      if (devMode) {
-        // Use mock categories if fetch fails in development mode
-        setCategories(mockCategories[type] || []);
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to load categories',
-          variant: 'destructive'
-        });
-      }
+      toast({
+        title: 'Error',
+        description: 'Failed to load categories',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!amount || !type || !categoryId) return;
+    if (!amount || !type || !categoryId) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
-    // In development mode without a user, simulate adding a transaction
-    if (devMode && !user) {
-      setTimeout(() => {
-        toast({
-          title: 'Success (Dev Mode)',
-          description: 'Transaction added successfully in development mode',
-          variant: 'default'
-        });
-        
-        resetForm();
-        onSuccess();
-        setIsSubmitting(false);
-      }, 500);
-      
-      return;
-    }
+    // Process tags if provided
+    const tagsArray = tags.trim() ? tags.split(',').map(tag => tag.trim()) : null;
     
     try {
       const { error } = await supabase
@@ -120,9 +95,10 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
           amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
           type,
           category_id: categoryId,
-          note: note || null,
-          date: new Date().toISOString(),
-          user_id: user.id
+          note: note.trim() || null,
+          date: date.toISOString(),
+          tags: tagsArray,
+          user_id: user?.id || 'dev-user'
         });
 
       if (error) throw error;
@@ -137,23 +113,11 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
     } catch (error) {
       console.error('Error adding transaction:', error);
       
-      if (devMode) {
-        // In dev mode, simulate success even if the database operation fails
-        toast({
-          title: 'Success (Dev Mode)',
-          description: 'Transaction added successfully in development mode',
-          variant: 'default'
-        });
-        
-        resetForm();
-        onSuccess();
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to add transaction',
-          variant: 'destructive'
-        });
-      }
+      toast({
+        title: 'Error',
+        description: 'Failed to add transaction',
+        variant: 'destructive'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -164,27 +128,56 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
     setType('expense');
     setCategoryId('');
     setNote('');
+    setTags('');
+    setDate(new Date());
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add Transaction</CardTitle>
+    <Card className="shadow-md border-border/60">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-xl">Add Transaction</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-4">
+            {/* Type Selection */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                type="button"
+                variant={type === 'expense' ? 'default' : 'outline'} 
+                className={cn(
+                  "w-full justify-center text-base font-normal h-10",
+                  type === 'expense' && "bg-red-500 hover:bg-red-600 text-white"
+                )}
+                onClick={() => setType('expense')}
+              >
+                Expense
+              </Button>
+              <Button 
+                type="button"
+                variant={type === 'income' ? 'default' : 'outline'} 
+                className={cn(
+                  "w-full justify-center text-base font-normal h-10",
+                  type === 'income' && "bg-green-500 hover:bg-green-600 text-white"
+                )}
+                onClick={() => setType('income')}
+              >
+                Income
+              </Button>
+            </div>
+
+            {/* Amount */}
             <div className="grid gap-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="amount" className="text-sm font-medium">Amount</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="amount"
                   type="number"
                   min="0.01"
                   step="0.01"
                   placeholder="0.00"
-                  className="pl-7"
+                  className="pl-10"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
@@ -192,53 +185,88 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
               </div>
             </div>
             
+            {/* Category */}
             <div className="grid gap-2">
-              <Label htmlFor="type">Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Select type" />
+              <Label htmlFor="category" className="text-sm font-medium">Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense">Expense</SelectItem>
-                  <SelectItem value="income">Income</SelectItem>
+                  {categories.length > 0 ? (
+                    categories.map((category) => (
+                      <SelectItem 
+                        key={category.id} 
+                        value={category.id}
+                      >
+                        <div className="flex items-center gap-2">
+                          {category.icon && (
+                            <span className="text-lg" style={{ color: category.color || undefined }}>
+                              {category.icon}
+                            </span>
+                          )}
+                          <span>{category.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-category" disabled>No categories available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="category">Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger id="category">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem 
-                    key={category.id} 
-                    value={category.id}
-                    className="flex items-center gap-2"
+            
+            {/* Date */}
+            <div className="grid gap-2">
+              <Label htmlFor="date" className="text-sm font-medium">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal h-10"
                   >
-                    {category.icon && (
-                      <span className="text-lg" style={{ color: category.color || undefined }}>
-                        {category.icon}
-                      </span>
-                    )}
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, 'PPP') : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(date) => date && setDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           
+          {/* Note */}
           <div className="grid gap-2">
-            <Label htmlFor="note">Note (optional)</Label>
-            <Input
+            <Label htmlFor="note" className="text-sm font-medium">Note (optional)</Label>
+            <Textarea
               id="note"
-              placeholder="Transaction note"
+              placeholder="Add details about this transaction"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              className="resize-none"
+              rows={2}
             />
+          </div>
+          
+          {/* Tags */}
+          <div className="grid gap-2">
+            <Label htmlFor="tags" className="text-sm font-medium">Tags (optional, comma separated)</Label>
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="tags"
+                placeholder="food, groceries, essential"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
           
           <Button 

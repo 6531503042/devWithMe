@@ -319,7 +319,6 @@ const DashboardPage = () => {
         </PageContainer>
       </main>
       
-      <AppFooter />
     </div>
   );
 };

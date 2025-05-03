@@ -64,7 +64,7 @@ const Index = () => {
           </div>
         </div>
       </div>
-    </PageContainer>
+    </PageContainer >
   );
 };
 
