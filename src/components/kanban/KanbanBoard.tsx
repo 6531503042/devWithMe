@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface KanbanCard {
   id: string;
@@ -42,6 +43,11 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
   const [newCardTags, setNewCardTags] = useState('');
   const { user } = useAuth();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Drag and drop state
+  const [draggedCard, setDraggedCard] = useState<KanbanCard | null>(null);
+  const [activeColumn, setActiveColumn] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBoardData();
@@ -49,6 +55,7 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
   }, [boardId]);
 
   const fetchBoardData = async () => {
+    setIsLoading(true);
     try {
       // Fetch columns
       const { data: columnsData, error: columnsError } = await supabase
@@ -73,6 +80,8 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
         description: 'Failed to load board data',
         variant: 'destructive'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -136,7 +145,6 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
     }
   };
 
-  // Drag and drop
   const moveCard = async (cardId: string, targetColumnId: string, newPosition: number) => {
     try {
       const { error } = await supabase
@@ -158,127 +166,302 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
   };
 
   const handleDragStart = (e: React.DragEvent, card: KanbanCard) => {
+    // Set data transfer for compatibility
     e.dataTransfer.setData('text/plain', JSON.stringify(card));
+    
+    // Set opacity on drag image
+    if (e.currentTarget instanceof HTMLElement) {
+      // Create a semi-transparent drag image
+      e.dataTransfer.effectAllowed = 'move';
+      
+      // Add visual indicator to the dragged element
+      setTimeout(() => {
+        if (e.currentTarget instanceof HTMLElement) {
+          e.currentTarget.classList.add('opacity-60', 'scale-105', 'shadow-lg');
+        }
+      }, 0);
+    }
+    
+    // Update state to track what's being dragged
+    setDraggedCard(card);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Clear drag state
+    setDraggedCard(null);
+    setActiveColumn(null);
+    
+    // Remove visual effects from the source element
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove('opacity-60', 'scale-105', 'shadow-lg');
+    }
+    
+    // Remove active column classes
+    document.querySelectorAll('.kanban-column').forEach(column => {
+      column.classList.remove('bg-primary/10', 'border-primary');
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    // Highlight the target column
+    if (activeColumn !== columnId) {
+      // Remove highlight from previous column
+      document.querySelectorAll('.kanban-column').forEach(column => {
+        column.classList.remove('bg-primary/10', 'border-primary');
+      });
+      
+      // Highlight current column
+      const currentColumn = document.getElementById(`column-${columnId}`);
+      if (currentColumn) {
+        currentColumn.classList.add('bg-primary/10', 'border-primary');
+      }
+      
+      setActiveColumn(columnId);
+    }
+  };
+
+  const handleDragEnter = (columnId: string) => {
+    setActiveColumn(columnId);
+    
+    // Apply visual cue to column on drag enter
+    document.querySelectorAll('.kanban-column').forEach(col => {
+      col.classList.remove('bg-primary/10', 'border-primary');
+    });
+    
+    const columnElement = document.querySelector(`.kanban-column[data-column-id="${columnId}"]`);
+    if (columnElement) {
+      columnElement.classList.add('bg-primary/10', 'border-primary');
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only remove highlight if we're leaving to an element that is not a child
+    if (e.currentTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
+      e.currentTarget.classList.remove('bg-primary/10', 'border-primary');
+    }
   };
 
   const handleDrop = async (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
+    
+    // Get card data from dataTransfer
     const cardData = JSON.parse(e.dataTransfer.getData('text/plain')) as KanbanCard;
-    if (cardData.column_id === columnId) return;
+    
+    // Prevent unnecessary moves within the same column
+    if (cardData.column_id === columnId) {
+      handleDragEnd(e);
+      return;
+    }
+    
+    // Calculate new position for the card
     const columnCards = cards.filter(c => c.column_id === columnId);
     const newPosition = columnCards.length > 0 
       ? Math.max(...columnCards.map(c => c.position)) + 1000
       : 1000;
-    await moveCard(cardData.id, columnId, newPosition);
+    
+    // Optimistically update the UI to prevent flickering or duplication
+    setCards(prevCards => {
+      return prevCards.map(card => 
+        card.id === cardData.id 
+          ? {...card, column_id: columnId, position: newPosition} 
+          : card
+      );
+    });
+
+    try {
+      // Update the card in the database
+      const { error } = await supabase
+        .from('kanban_cards')
+        .update({ 
+          column_id: columnId,
+          position: newPosition,
+        })
+        .eq('id', cardData.id);
+      
+      if (error) throw error;
+      
+      // Add visual feedback for successful drop
+      const targetElement = document.getElementById(`card-${cardData.id}`);
+      if (targetElement) {
+        targetElement.classList.add('scale-105');
+        setTimeout(() => {
+          targetElement.classList.remove('scale-105');
+        }, 300);
+      }
+    } catch (error) {
+      console.error('Error moving card:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to move card',
+        variant: 'destructive'
+      });
+      
+      // Revert the UI change if database update failed
+      await fetchBoardData();
+    }
+    
+    // Clear drag state
+    handleDragEnd(e);
   };
 
+  const KanbanSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {[1, 2, 3].map((colIndex) => (
+        <div key={colIndex} className="bg-secondary/30 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-6 w-6 rounded-full" />
+          </div>
+          
+          <div className="space-y-3">
+            {Array.from({ length: 2 + colIndex % 2 }).map((_, cardIndex) => (
+              <Card key={cardIndex} className="relative">
+                <CardContent className="p-3">
+                  <Skeleton className="h-5 w-3/4 mb-2" />
+                  <Skeleton className="h-3 w-full mb-3" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="mt-3">
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <>
-      <div className="flex gap-4 mb-4">
-        <Button variant="outline" onClick={() => setIsAddColumnOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Column
-        </Button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {columns.map(column => (
-          <div
-            key={column.id}
-            className="flex flex-col h-[500px] md:h-[600px]"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, column.id)}
-          >
-            <div className="bg-secondary rounded-t-md p-3 flex justify-between items-center">
-              <h3 className="font-medium text-sm">{column.title}</h3>
-              <span className="text-xs text-muted-foreground bg-background rounded-full px-2 py-0.5">
-                {cards.filter(card => card.column_id === column.id).length}
-              </span>
-            </div>
-            <div className="flex-grow overflow-auto bg-secondary/50 rounded-b-md p-2 space-y-2">
-              {cards
-                .filter(card => card.column_id === column.id)
-                .map(card => {
-                  // Generate different colors based on card id
-                  const colors = ["border-l-primary", "border-l-blue-500", "border-l-green-500", "border-l-amber-500", "border-l-rose-500", "border-l-indigo-500"];
-                  const colorIndex = Math.abs(card.id.charCodeAt(0) + card.id.charCodeAt(1)) % colors.length;
-                  
-                  return (
-                    <Card 
-                      key={card.id}
-                      className={`cursor-move card-hover border-l-4 ${colors[colorIndex]} bg-card shadow-sm`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, card)}
-                    >
-                      <CardContent className="p-3">
-                        <h4 className="font-medium text-sm">{card.title}</h4>
-                        {card.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
-                        )}
-                        {card.tags && card.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {card.tags.map(tag => (
-                              <span 
-                                key={tag} 
-                                className="text-xs rounded-full bg-secondary px-2 py-0.5 text-muted-foreground"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              {cards.filter(card => card.column_id === column.id).length === 0 && (
-                <div className="flex items-center justify-center h-20 border border-dashed rounded-md border-muted text-muted-foreground text-sm">
-                  No cards
-                </div>
-              )}
-              <Button 
-                onClick={() => {
-                  setAddCardColumnId(column.id);
-                  setIsAddCardOpen(true);
-                }}
-                variant="ghost" 
-                className="w-full mt-2 border border-dashed text-muted-foreground"
+    <div className="my-4">
+      {isLoading ? (
+        <KanbanSkeleton />
+      ) : (
+        <>
+          <div className="flex flex-no-wrap overflow-x-auto pb-4 gap-4">
+            {columns.map(column => (
+              <div
+                key={column.id}
+                data-column-id={column.id}
+                className={`kanban-column flex-shrink-0 w-80 bg-secondary/30 rounded-lg p-4 border-2 border-transparent transition-colors ${
+                  activeColumn === column.id ? 'bg-primary/10 border-primary' : ''
+                }`}
+                onDragOver={(e) => handleDragOver(e, column.id)}
+                onDrop={(e) => handleDrop(e, column.id)}
+                onDragEnter={(e) => handleDragEnter(column.id)}
+                onDragLeave={handleDragLeave}
               >
-                <Plus className="h-4 w-4 mr-1" /> Add Card
-              </Button>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">{column.title}</h3>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => {
+                        setAddCardColumnId(column.id);
+                        setIsAddCardOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 min-h-[50px]">
+                  {cards
+                    .filter(card => card.column_id === column.id)
+                    .map(card => (
+                      <Card
+                        key={card.id}
+                        className="relative cursor-move"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, card)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <CardContent className="p-3">
+                          <h4 className="font-medium mb-1">{card.title}</h4>
+                          {card.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{card.description}</p>
+                          )}
+                          {card.tags && card.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {card.tags.map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+                
+                <Button
+                  variant="ghost"
+                  className="w-full mt-3 border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 hover:bg-muted/50"
+                  onClick={() => {
+                    setAddCardColumnId(column.id);
+                    setIsAddCardOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Add Card
+                </Button>
+              </div>
+            ))}
+            
+            <div className="flex-shrink-0 w-80">
+              {isAddColumnOpen ? (
+                <Card className="p-4">
+                  <form onSubmit={handleAddColumn}>
+                    <Label htmlFor="column-title">Column Title</Label>
+                    <Input
+                      id="column-title"
+                      value={newColumnTitle}
+                      onChange={(e) => setNewColumnTitle(e.target.value)}
+                      placeholder="e.g. To Do"
+                      className="mb-2"
+                      autoFocus
+                    />
+                    <div className="flex justify-end space-x-2 mt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddColumnOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" size="sm">
+                        Add Column
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-auto py-8 px-4 w-full border-dashed"
+                  onClick={() => setIsAddColumnOpen(true)}
+                >
+                  <Plus className="h-5 w-5 mr-2" /> Add Column
+                </Button>
+              )}
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Add Column Dialog */}
-      <Dialog open={isAddColumnOpen} onOpenChange={setIsAddColumnOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Add New Column</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddColumn} className="space-y-4 mt-2">
-            <div className="grid gap-2">
-              <Label htmlFor="column-title">Column Title</Label>
-              <Input
-                id="column-title"
-                value={newColumnTitle}
-                onChange={(e) => setNewColumnTitle(e.target.value)}
-                placeholder="e.g. Backlog"
-                required
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddColumnOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Add Column</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        </>
+      )}
 
       {/* Add Card Dialog */}
       <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
@@ -297,8 +480,9 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                 required
               />
             </div>
+            
             <div className="grid gap-2">
-              <Label htmlFor="card-description">Description</Label>
+              <Label htmlFor="card-description">Description (optional)</Label>
               <Textarea
                 id="card-description"
                 value={newCardDescription}
@@ -307,15 +491,17 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                 rows={3}
               />
             </div>
+            
             <div className="grid gap-2">
-              <Label htmlFor="card-tags">Tags (comma separated)</Label>
+              <Label htmlFor="card-tags">Tags (comma separated, optional)</Label>
               <Input
                 id="card-tags"
                 value={newCardTags}
                 onChange={(e) => setNewCardTags(e.target.value)}
-                placeholder="frontend, bug, critical"
+                placeholder="frontend, bug, urgent"
               />
             </div>
+            
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsAddCardOpen(false)}>
                 Cancel
@@ -325,7 +511,7 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
 

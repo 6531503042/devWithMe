@@ -938,3 +938,62 @@ body[class*="timer-theme-seoul"]::before {
 .timer-tabs [role="tab"] {
   transition: all 0.2s ease;
 }
+
+/* Kanban board drag and drop animations */
+.card-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-out {
+  animation: fadeOut 0.3s ease-in-out;
+}
+
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+.fade-out {
+  opacity: 1;
+  animation: fadeOut 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Kanban column highlight during drag */
+.kanban-column {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.kanban-column.bg-primary\/10 {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}

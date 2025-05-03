@@ -435,31 +435,7 @@ const PomodoroPage = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-medium">Total Sessions</h3>
-              <p className="text-3xl font-bold mt-2">{totalStats.totalSessions}</p>
-              <p className="text-sm text-muted-foreground mt-1">All time</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-medium">Total Focus Time</h3>
-              <p className="text-3xl font-bold mt-2">{totalStats.totalHours}</p>
-              <p className="text-sm text-muted-foreground mt-1">All time</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-medium">Best Day</h3>
-              <p className="text-3xl font-bold mt-2">{totalStats.bestDay.hours}</p>
-              <p className="text-sm text-muted-foreground mt-1">{totalStats.bestDay.date || "No data yet"}</p>
-            </CardContent>
-          </Card>
-        </div>
+        </div>        
       </>
     );
   };

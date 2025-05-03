@@ -20,8 +20,8 @@ const Index = () => {
           
           <div className="flex justify-center gap-4 mt-8">
             {user ? (
-              <Link to="/tasks">
-                <Button size="lg">Go to Tasks</Button>
+              <Link to="/dashboard">
+                <Button size="lg">Go to Dashboard</Button>
               </Link>
             ) : (
               <>

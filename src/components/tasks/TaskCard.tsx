@@ -2,25 +2,68 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Clock, 
-  Calendar, 
-  RefreshCw, 
-  ListChecks, 
-  Target, 
+  CheckCircle2, 
+  Circle, 
   Timer, 
-  Flame,
-  ChevronUp,
-  ChevronDown,
-  Plus,
-  Minus
+  CalendarDays, 
+  ListChecks, 
+  TrendingUp, 
+  Briefcase, 
+  Home, 
+  Code, 
+  Heart, 
+  DollarSign, 
+  GraduationCap, 
+  Tag,
+  X,
+  AlertCircle,
+  Target
 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
-type TaskType = Database['public']['Enums']['task_type'];
+// Define category with icon mapping for consistency with TaskForm
+interface CategoryWithIcon {
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+// Same pre-defined categories with icons as in TaskForm
+const categoriesWithIcons: CategoryWithIcon[] = [
+  { name: 'Work', icon: <Briefcase className="h-4 w-4" />, color: "text-blue-600" },
+  { name: 'Personal', icon: <Home className="h-4 w-4" />, color: "text-purple-600" },
+  { name: 'Coding', icon: <Code className="h-4 w-4" />, color: "text-green-600" },
+  { name: 'Health', icon: <Heart className="h-4 w-4" />, color: "text-rose-600" },
+  { name: 'Finance', icon: <DollarSign className="h-4 w-4" />, color: "text-emerald-600" },
+  { name: 'Education', icon: <GraduationCap className="h-4 w-4" />, color: "text-amber-600" },
+  { name: 'Other', icon: <Tag className="h-4 w-4" />, color: "text-gray-600" },
+];
+
+// Helper function to get category icon and color
+const getCategoryIcon = (categoryName: string) => {
+  if (!categoryName) return { icon: <Tag className="h-4 w-4" />, color: "text-gray-600" };
+  
+  const category = categoriesWithIcons.find(
+    cat => cat.name.toLowerCase() === categoryName.toLowerCase()
+  );
+  
+  return category || { icon: <Tag className="h-4 w-4" />, color: "text-gray-600" };
+};
+
+// Define the TaskType as a union of literal strings (same as TaskForm)
+type TaskType = 'task' | 'habit' | 'recurring';
+
+// Reuse the ChecklistItem interface
+interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 
 interface Task {
   id: string;
@@ -37,11 +80,7 @@ interface Task {
   timer_goal_elapsed: number | null;
   streak: number | null;
   best_streak: number | null;
-  task_checklist_items?: {
-    id: string;
-    text: string;
-    done: boolean;
-  }[];
+  task_checklist_items?: ChecklistItem[];
 }
 
 interface TaskCardProps {
@@ -52,350 +91,309 @@ interface TaskCardProps {
   onChecklistUpdate?: (id: string, itemId: string, done: boolean) => void;
 }
 
-const TaskCard = ({ 
+const TaskCard: React.FC<TaskCardProps> = ({
   task, 
   onComplete,
   onNumericUpdate,
   onTimerUpdate,
   onChecklistUpdate
-}: TaskCardProps) => {
-  const getTypeIcon = () => {
-    switch (task.type) {
-      case 'habit':
-        return <RefreshCw className="h-4 w-4 text-blue-500" />;
-      case 'recurring':
-        return <Calendar className="h-4 w-4 text-green-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-amber-500" />;
-    }
-  };
-
-  const getGoalIcon = () => {
-    if (task.numeric_goal_target) {
-      return <Target className="h-4 w-4 text-purple-500" />;
-    } else if (task.timer_goal_duration) {
-      return <Timer className="h-4 w-4 text-indigo-500" />;
-    } else if (task.task_checklist_items) {
-      return <ListChecks className="h-4 w-4 text-teal-500" />;
-    }
-    return null;
-  };
-
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '';
+}) => {
+  const hasTracking = 
+    (task.numeric_goal_target !== null) ||
+    (task.timer_goal_duration !== null) ||
+    (task.task_checklist_items && task.task_checklist_items.length > 0);
     
+  const progressValue = 
+    task.numeric_goal_target && task.numeric_goal_current
+      ? Math.min(100, (task.numeric_goal_current / task.numeric_goal_target) * 100)
+      : task.timer_goal_duration && task.timer_goal_elapsed
+      ? Math.min(100, (task.timer_goal_elapsed / task.timer_goal_duration) * 100)
+      : task.task_checklist_items && task.task_checklist_items.length > 0
+      ? Math.round((task.task_checklist_items.filter(item => item.done).length / task.task_checklist_items.length) * 100)
+      : 0;
+      
+  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed;
+  
+  // Get the category icon and color
+  const { icon: categoryIcon, color: categoryColor } = getCategoryIcon(task.category || '');
+  
+  // Calculate days left if due date exists
+  const getDaysLeft = () => {
+    if (!task.due_date) return null;
+    const dueDate = new Date(task.due_date);
     const today = new Date();
+    
+    // Set time to beginning of day for both dates for accurate comparison
+    dueDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
     
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    const date = new Date(dateStr);
-    
-    // Check if date is today
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    }
-    
-    // Check if date is tomorrow
-    if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
-    }
-    
-    // Format date to show day of week for upcoming 7 days
-    const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays > 0 && diffDays <= 7) {
-      return date.toLocaleDateString(undefined, { weekday: 'long' });
-    }
-    
-    // Default format for other dates
-    return date.toLocaleDateString(undefined, { 
-      month: 'short', 
-      day: 'numeric',
-      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-    });
+    return diffDays;
   };
 
-  // Calculate progress percentage for numeric goals and timer goals
-  const getProgressPercentage = () => {
-    if (task.numeric_goal_target && task.numeric_goal_current !== null) {
-      return Math.min(100, (task.numeric_goal_current / task.numeric_goal_target) * 100);
-    } else if (task.timer_goal_duration && task.timer_goal_elapsed !== null) {
-      return Math.min(100, (task.timer_goal_elapsed / task.timer_goal_duration) * 100);
-    }
-    return 0;
-  };
-
-  // Format the goal text for display
-  const getGoalText = () => {
-    if (task.numeric_goal_target && task.numeric_goal_current !== null) {
-      return `${task.numeric_goal_current}/${task.numeric_goal_target} ${task.numeric_goal_unit || ''}`;
-    } else if (task.timer_goal_duration && task.timer_goal_elapsed !== null) {
-      return `${task.timer_goal_elapsed}/${task.timer_goal_duration} min`;
-    } else if (task.task_checklist_items) {
-      const completed = task.task_checklist_items.filter(i => i.done).length;
-      return `${completed}/${task.task_checklist_items.length}`;
-    }
-    return null;
-  };
-  
-  // Check if task is overdue
-  const isOverdue = () => {
-    if (!task.due_date || task.completed) return false;
-    const now = new Date();
-    return new Date(task.due_date) < now;
-  };
-  
-  // Handle numeric goal updates
-  const incrementNumeric = () => {
-    if (task.numeric_goal_current !== null && task.numeric_goal_target && onNumericUpdate) {
-      onNumericUpdate(task.id, Math.min(task.numeric_goal_current + 1, task.numeric_goal_target));
-    }
-  };
-  
-  const decrementNumeric = () => {
-    if (task.numeric_goal_current !== null && onNumericUpdate) {
-      onNumericUpdate(task.id, Math.max(task.numeric_goal_current - 1, 0));
-    }
-  };
-  
-  // Handle timer goal updates
-  const incrementTimer = () => {
-    if (task.timer_goal_elapsed !== null && task.timer_goal_duration && onTimerUpdate) {
-      onTimerUpdate(task.id, Math.min(task.timer_goal_elapsed + 5, task.timer_goal_duration));
-    }
-  };
-  
-  const decrementTimer = () => {
-    if (task.timer_goal_elapsed !== null && onTimerUpdate) {
-      onTimerUpdate(task.id, Math.max(task.timer_goal_elapsed - 5, 0));
-    }
-  };
-
-  // Get accent color based on task type
-  const getAccentColor = () => {
-    switch (task.type) {
-      case 'habit':
-        return 'border-l-blue-500';
-      case 'recurring':
-        return 'border-l-green-500';
-      default:
-        return 'border-l-amber-500';
-    }
-  };
-
-  const getProgressColor = () => {
-    const percentage = getProgressPercentage();
-    if (percentage >= 100) return 'bg-green-500';
-    if (percentage > 66) return 'bg-blue-500';
-    if (percentage > 33) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  // Format streak display
-  const renderStreak = () => {
-    if (task.streak === null || task.streak === 0) return null;
-    
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-1 text-amber-500">
-              <Flame className="h-4 w-4" />
-              <span className="font-medium">{task.streak}</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs">
-              Current streak: {task.streak} days
-              {task.best_streak && task.best_streak > 0 && (
-                <span className="block">Best streak: {task.best_streak} days</span>
-              )}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  };
-
-  const getCardClasses = () => {
-    let classes = `relative transition-all duration-200 border-l-4 ${getAccentColor()}`;
-    
-    if (task.completed) {
-      classes += ' bg-muted/20';
-    }
-    
-    if (isOverdue()) {
-      classes += ' ring-1 ring-red-500/30';
-    }
-    
-    return classes;
-  };
+  const daysLeft = getDaysLeft();
 
   return (
-    <Card className={getCardClasses()}>
-      <CardContent className="p-4">
+    <Card className={cn(
+      "relative overflow-hidden transition-all duration-300 group hover:shadow-md border-l-4",
+      task.completed ? "border-l-green-500 bg-green-50/30" : isOverdue ? "border-l-red-500" : "border-l-primary"
+    )}>
+      <div className={cn(
+        "absolute inset-0 opacity-0 transition-opacity",
+        task.completed && "bg-green-50/50 opacity-30"
+      )} />
+      
+      <CardContent className="p-4 relative">
+        {/* Header with checkbox and type/status indicators */}
         <div className="flex items-start gap-3">
+          <div className="shrink-0 mt-0.5">
           <Checkbox 
-            id={`task-${task.id}`} 
             checked={task.completed}
             onCheckedChange={(checked) => onComplete(task.id, checked as boolean)}
-            className="mt-1"
-          />
+              className={cn(
+                "h-5 w-5 rounded-full transition-all", 
+                task.completed ? "bg-green-500 text-white" : "",
+                isOverdue && !task.completed ? "border-red-500" : ""
+              )}
+            />
+          </div>
+          
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`font-medium ${task.completed ? 'text-muted-foreground line-through' : ''}`}>
+              <h3 className={cn(
+                "font-medium line-clamp-1 transition-all",
+                task.completed ? "text-muted-foreground line-through" : "text-foreground",
+                isOverdue && !task.completed ? "text-red-700" : ""
+              )}>
                   {task.title}
+              </h3>
+              
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Category badge with icon */}
+                {task.category && (
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      "text-xs py-0 h-5 gap-1 font-normal",
+                      categoryColor
+                    )}
+                  >
+                    <span className="flex-shrink-0">{categoryIcon}</span>
+                    <span className="truncate max-w-[80px]">{task.category}</span>
+                  </Badge>
+                )}
+                
+                {/* Type badge */}
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs py-0 h-5 font-normal"
+                >
+                  {task.type === 'habit' ? (
+                    <span className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      <span>Habit</span>
+                    </span>
+                  ) : task.type === 'recurring' ? (
+                    <span className="flex items-center gap-1">
+                      <Circle className="h-3 w-3" />
+                      <span>Recurring</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>Task</span>
                 </span>
-                {renderStreak()}
-              </div>
-              <div className="flex gap-1 items-center text-xs">
-                {getTypeIcon()}
-                <span className="capitalize text-muted-foreground">{task.type}</span>
+                  )}
+                </Badge>
               </div>
             </div>
             
+            {/* Description */}
             {task.description && (
-              <p className={`text-sm mb-2 ${task.completed ? 'text-muted-foreground line-through' : 'text-muted-foreground'}`}>
+              <p className={cn(
+                "text-sm mb-2",
+                task.completed ? "text-muted-foreground/70" : "text-muted-foreground"
+              )}>
                 {task.description}
               </p>
             )}
             
-            {/* Numeric Goal UI */}
-            {task.numeric_goal_target !== null && task.numeric_goal_current !== null && (
-              <div className="mt-2 space-y-1.5">
+            {/* Tracking section */}
+            {hasTracking && (
+              <div className={cn(
+                "mt-3 p-2 rounded-md bg-secondary/50",
+                task.completed ? "opacity-60" : ""
+              )}>
+                {/* Numeric goal tracking */}
+                {task.numeric_goal_target !== null && (
+                  <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <Target className="h-4 w-4 text-purple-500" />
-                    <span className="font-medium">Goal Progress</span>
-                  </div>
-                  <span>
-                    {task.numeric_goal_current}/{task.numeric_goal_target} {task.numeric_goal_unit || ''}
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Target className="h-3.5 w-3.5" />
+                        <span>Progress</span>
+                      </span>
+                      <span className="font-medium">
+                        {task.numeric_goal_current || 0} / {task.numeric_goal_target} {task.numeric_goal_unit}
                   </span>
                 </div>
-                <div className="relative pt-1">
-                  <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`flex flex-col justify-center overflow-hidden ${getProgressColor()}`}
-                      style={{ width: `${getProgressPercentage()}%` }}
-                    ></div>
-                  </div>
-                </div>
-                {onNumericUpdate && !task.completed && (
-                  <div className="flex items-center justify-end gap-2 mt-1">
+                    
+                    <Progress value={progressValue} className="h-1.5" />
+                    
+                    {!task.completed && (
+                      <div className="flex items-center gap-1 mt-2">
                     <Button 
+                          size="sm"
                       variant="outline" 
-                      size="icon" 
-                      className="h-6 w-6 rounded-full"
-                      onClick={decrementNumeric}
-                      disabled={task.numeric_goal_current <= 0}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onNumericUpdate?.(task.id, Math.max(0, (task.numeric_goal_current || 0) - 1))}
                     >
-                      <Minus className="h-3 w-3" />
+                          -
                     </Button>
+                        <Input
+                          type="number"
+                          value={task.numeric_goal_current || 0}
+                          onChange={(e) => onNumericUpdate?.(task.id, Math.max(0, parseInt(e.target.value) || 0))}
+                          className="h-7 text-center text-xs"
+                        />
                     <Button 
+                          size="sm"
                       variant="outline" 
-                      size="icon" 
-                      className="h-6 w-6 rounded-full"
-                      onClick={incrementNumeric}
-                      disabled={task.numeric_goal_current >= task.numeric_goal_target}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onNumericUpdate?.(task.id, (task.numeric_goal_current || 0) + 1)}
                     >
-                      <Plus className="h-3 w-3" />
+                          +
                     </Button>
                   </div>
                 )}
               </div>
             )}
             
-            {/* Timer Goal UI */}
-            {task.timer_goal_duration !== null && task.timer_goal_elapsed !== null && (
-              <div className="mt-2 space-y-1.5">
+                {/* Timer goal tracking */}
+                {task.timer_goal_duration !== null && (
+                  <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <Timer className="h-4 w-4 text-indigo-500" />
-                    <span className="font-medium">Time Progress</span>
-                  </div>
-                  <span>
-                    {task.timer_goal_elapsed}/{task.timer_goal_duration} minutes
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Timer className="h-3.5 w-3.5" />
+                        <span>Time Spent</span>
+                      </span>
+                      <span className="font-medium">
+                        {task.timer_goal_elapsed || 0} / {task.timer_goal_duration} min
                   </span>
                 </div>
-                <div className="relative pt-1">
-                  <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`flex flex-col justify-center overflow-hidden ${getProgressColor()}`}
-                      style={{ width: `${getProgressPercentage()}%` }}
-                    ></div>
-                  </div>
-                </div>
-                {onTimerUpdate && !task.completed && (
-                  <div className="flex items-center justify-end gap-2 mt-1">
+                    
+                    <Progress value={progressValue} className="h-1.5" />
+                    
+                    {!task.completed && (
+                      <div className="flex items-center gap-1 mt-2">
                     <Button 
+                          size="sm"
                       variant="outline" 
-                      size="icon" 
-                      className="h-6 w-6 rounded-full"
-                      onClick={decrementTimer}
-                      disabled={task.timer_goal_elapsed <= 0}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onTimerUpdate?.(task.id, Math.max(0, (task.timer_goal_elapsed || 0) - 5))}
                     >
-                      <Minus className="h-3 w-3" />
+                          -5m
                     </Button>
+                        <Input
+                          type="number"
+                          value={task.timer_goal_elapsed || 0}
+                          onChange={(e) => onTimerUpdate?.(task.id, Math.max(0, parseInt(e.target.value) || 0))}
+                          className="h-7 text-center text-xs"
+                        />
                     <Button 
+                          size="sm"
                       variant="outline" 
-                      size="icon" 
-                      className="h-6 w-6 rounded-full"
-                      onClick={incrementTimer}
-                      disabled={task.timer_goal_elapsed >= task.timer_goal_duration}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onTimerUpdate?.(task.id, (task.timer_goal_elapsed || 0) + 5)}
                     >
-                      <Plus className="h-3 w-3" />
+                          +5m
                     </Button>
                   </div>
                 )}
               </div>
             )}
             
-            {/* Checklist if available */}
+                {/* Checklist tracking */}
             {task.task_checklist_items && task.task_checklist_items.length > 0 && (
-              <div className="mt-2 space-y-1.5 bg-secondary/20 p-2 rounded-md">
-                <div className="text-xs font-medium flex items-center gap-1 text-muted-foreground">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
                   <ListChecks className="h-3.5 w-3.5" />
-                  <span>Checklist ({task.task_checklist_items.filter(i => i.done).length}/{task.task_checklist_items.length})</span>
+                        <span>Checklist</span>
+                      </span>
+                      <span className="font-medium">
+                        {task.task_checklist_items.filter(item => item.done).length} / {task.task_checklist_items.length}
+                      </span>
                 </div>
-                <div className="space-y-1 mt-1">
-                  {task.task_checklist_items.map(item => (
-                    <div key={item.id} className="flex items-center gap-1.5">
+                    
+                    <Progress value={progressValue} className="h-1.5 mb-1" />
+                    
+                    <div className="space-y-1 mt-1.5">
+                      {task.task_checklist_items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
                       <Checkbox 
+                            id={`checklist-item-${item.id}`}
                         checked={item.done}
-                        id={`item-${item.id}`}
+                            onCheckedChange={(checked) => onChecklistUpdate?.(task.id, item.id, checked as boolean)}
                         className="h-3.5 w-3.5"
-                        onCheckedChange={(checked) => 
-                          onChecklistUpdate && onChecklistUpdate(task.id, item.id, checked as boolean)
-                        }
+                            disabled={task.completed}
                       />
                       <label 
-                        htmlFor={`item-${item.id}`}
-                        className={`text-xs ${item.done ? 'line-through text-muted-foreground' : ''}`}
+                            htmlFor={`checklist-item-${item.id}`}
+                            className={cn(
+                              "text-xs transition-all cursor-pointer flex-1",
+                              item.done ? "line-through text-muted-foreground/70" : "text-foreground"
+                            )}
                       >
                         {item.text}
                       </label>
                     </div>
                   ))}
                 </div>
+                  </div>
+                )}
               </div>
             )}
             
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {task.category && (
-                <Badge variant="outline" className="text-xs bg-secondary/50">
-                  {task.category}
-                </Badge>
-              )}
+            {/* Footer with due date, streak info */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+              {/* Due date */}
               {task.due_date && (
-                <Badge 
-                  variant={isOverdue() ? "destructive" : "outline"} 
-                  className={`text-xs ${isOverdue() ? '' : 'bg-secondary/50'}`}
-                >
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {formatDate(task.due_date)}
-                </Badge>
+                <div className={cn(
+                  "flex items-center gap-1",
+                  isOverdue ? "text-red-500 font-medium" : ""
+                )}>
+                  {isOverdue ? (
+                    <AlertCircle className="h-3.5 w-3.5" />
+                  ) : (
+                    <CalendarDays className="h-3.5 w-3.5" />
+                  )}
+                  <span>
+                    {isOverdue ? (
+                      `Overdue${daysLeft ? ` by ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? 's' : ''}` : ''}`
+                    ) : (
+                      daysLeft === 0 ? (
+                        "Due today"
+                      ) : daysLeft === 1 ? (
+                        "Due tomorrow"
+                      ) : (
+                        `Due in ${daysLeft} days`
+                      )
+                    )}
+                  </span>
+                </div>
+              )}
+              
+              {/* Streak for habits */}
+              {task.type === 'habit' && task.streak !== null && (
+                <div className="flex items-center gap-1 text-xs">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span>{task.streak} day streak</span>
+                  {task.best_streak && task.best_streak > 0 && task.best_streak > task.streak && (
+                    <span className="text-muted-foreground/70">(best: {task.best_streak})</span>
+                  )}
+                </div>
               )}
             </div>
           </div>

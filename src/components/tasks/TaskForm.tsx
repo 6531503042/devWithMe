@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,11 +6,29 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Minus, ListChecks, Target, Timer, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { Plus, Minus, ListChecks, Target, Timer, ChevronRight, ChevronLeft, CheckCircle2, Briefcase, Home, Code, Heart, DollarSign, GraduationCap, Tag } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 // Define the task type as a union of literal strings
 type TaskType = 'task' | 'habit' | 'recurring';
+
+// Define category with icon mapping
+interface CategoryWithIcon {
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+// Pre-defined categories with icons
+const categoriesWithIcons: CategoryWithIcon[] = [
+  { name: 'Work', icon: <Briefcase className="h-4 w-4" />, color: "text-blue-600" },
+  { name: 'Personal', icon: <Home className="h-4 w-4" />, color: "text-purple-600" },
+  { name: 'Coding', icon: <Code className="h-4 w-4" />, color: "text-green-600" },
+  { name: 'Health', icon: <Heart className="h-4 w-4" />, color: "text-rose-600" },
+  { name: 'Finance', icon: <DollarSign className="h-4 w-4" />, color: "text-emerald-600" },
+  { name: 'Education', icon: <GraduationCap className="h-4 w-4" />, color: "text-amber-600" },
+  { name: 'Other', icon: <Tag className="h-4 w-4" />, color: "text-gray-600" },
+];
 
 interface Task {
   id: string;
@@ -64,9 +82,26 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
   const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; done: boolean }[]>([
     { id: '1', text: '', done: false }
   ]);
+
+  // Track if we've initialized tracking type for habit
+  const [hasSetInitialTrackingType, setHasSetInitialTrackingType] = useState(false);
+
+  // Set default tracking type for habits
+  useEffect(() => {
+    if (type === 'habit' && !hasSetInitialTrackingType) {
+      setTrackingType('numeric');
+      setHasSetInitialTrackingType(true);
+    }
+  }, [type, hasSetInitialTrackingType]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation for habits - they should have a tracking type
+    if (type === 'habit' && trackingType === 'none') {
+      // Show validation error - habits need a tracking method
+      return;
+    }
     
     const task = {
       id: Date.now().toString(),
@@ -131,9 +166,8 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
     setNumericUnit('');
     setTimerDuration('15');
     setChecklistItems([{ id: '1', text: '', done: false }]);
+    setHasSetInitialTrackingType(false);
   };
-
-  const categories = ['Work', 'Personal', 'Coding', 'Health', 'Finance', 'Education'];
   
   const addChecklistItem = () => {
     setChecklistItems([
@@ -181,6 +215,13 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
         return "Create Task";
     }
   };
+
+  // Jump directly to a specific step if clicked
+  const goToStep = (step: number) => {
+    // Don't allow skipping step 1 if title is empty
+    if (step > 1 && !title.trim()) return;
+    setCurrentStep(step);
+  };
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -189,34 +230,37 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
           <DialogTitle>Create New Task - {getStepTitle()}</DialogTitle>
         </DialogHeader>
 
-        {/* Stepper */}
+        {/* Improved Stepper */}
         <div className="mb-6 mt-2">
           <div className="flex justify-between mb-2">
             {[1, 2, 3].map((step) => (
               <div 
                 key={step} 
                 className="flex flex-col items-center"
+                onClick={() => goToStep(step)}
+                role="button"
+                tabIndex={0}
               >
                 <div 
-                  className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 cursor-pointer transition-all ${
                     currentStep >= step 
-                      ? 'bg-primary text-primary-foreground border-primary' 
-                      : 'bg-secondary text-secondary-foreground border-muted'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-md' 
+                      : 'bg-secondary text-secondary-foreground border-muted hover:bg-secondary/80'
                   }`}
                 >
                   {currentStep > step ? (
-                    <CheckCircle2 className="h-4 w-4" />
+                    <CheckCircle2 className="h-5 w-5" />
                   ) : (
-                    <span>{step}</span>
+                    <span className="font-medium">{step}</span>
                   )}
                 </div>
-                <span className="text-xs mt-1 text-muted-foreground">
+                <span className="text-xs mt-1 text-muted-foreground font-medium">
                   {step === 1 ? 'Basics' : step === 2 ? 'Details' : 'Tracking'}
                 </span>
               </div>
             ))}
           </div>
-          <Progress value={(currentStep / 3) * 100} className="h-1.5" />
+          <Progress value={(currentStep / 3) * 100} className="h-2" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
@@ -254,7 +298,16 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
               <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="type" className="text-base">Type</Label>
-                  <Select value={type} onValueChange={(value: TaskType) => setType(value)}>
+                  <Select value={type} onValueChange={(value: TaskType) => {
+                    setType(value);
+                    // Reset tracking type when switching types
+                    if (value === 'habit') {
+                      setTrackingType('numeric');  // Default for habits
+                      setHasSetInitialTrackingType(true);
+                    } else {
+                      setTrackingType('none');
+                    }
+                  }}>
                     <SelectTrigger id="type" className="h-10">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -273,17 +326,22 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat.toLowerCase()}>
-                          {cat}
+                      {categoriesWithIcons.map((cat) => (
+                        <SelectItem key={cat.name} value={cat.name.toLowerCase()}>
+                          <div className="flex items-center gap-2">
+                            <span className={cat.color}>{cat.icon}</span>
+                            <span>{cat.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 
+                {/* Show due date only for task and recurring types, not for habits */}
+                {type !== 'habit' && (
                 <div className="grid gap-2">
-                  <Label htmlFor="dueDate" className="text-base">Due Date (optional)</Label>
+                    <Label htmlFor="dueDate" className="text-base">Due Date {type === 'recurring' ? '(first occurrence)' : '(optional)'}</Label>
                   <Input 
                     id="dueDate"
                     type="date"
@@ -292,6 +350,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
                     className="h-10"
                   />
                 </div>
+                )}
               </div>
             </>
           )}
@@ -299,28 +358,48 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
           {/* Step 3: Tracking Options */}
           {currentStep === 3 && (
             <>
-              {(type === 'habit' || type === 'task') ? (
                 <div className="grid gap-2">
-                  <Label className="text-base">How would you like to track this {type}?</Label>
+                <Label className="text-base mb-2">
+                  {type === 'habit' 
+                    ? 'How would you like to track this habit? (required)'
+                    : 'How would you like to track this task? (optional)'}
+                </Label>
                   <Tabs 
                     value={trackingType} 
                     onValueChange={(v) => setTrackingType(v as 'none' | 'numeric' | 'timer' | 'checklist')}
                     className="w-full"
                   >
                     <TabsList className="grid grid-cols-4 w-full">
+                    {type !== 'habit' && (
                       <TabsTrigger value="none">None</TabsTrigger>
-                      <TabsTrigger value="numeric" className="flex items-center gap-1">
+                    )}
+                    <TabsTrigger 
+                      value="numeric" 
+                      className="flex items-center gap-1"
+                      disabled={type === 'habit' ? false : false}
+                    >
                         <Target className="h-3.5 w-3.5" />
                         <span>Goal</span>
                       </TabsTrigger>
-                      <TabsTrigger value="timer" className="flex items-center gap-1">
+                    <TabsTrigger 
+                      value="timer" 
+                      className="flex items-center gap-1"
+                      disabled={type === 'habit' ? false : false}
+                    >
                         <Timer className="h-3.5 w-3.5" />
                         <span>Timer</span>
                       </TabsTrigger>
-                      <TabsTrigger value="checklist" className="flex items-center gap-1">
+                    <TabsTrigger 
+                      value="checklist" 
+                      className="flex items-center gap-1"
+                      disabled={type === 'habit' ? false : false}
+                    >
                         <ListChecks className="h-3.5 w-3.5" />
                         <span>List</span>
                       </TabsTrigger>
+                    {type === 'habit' && (
+                      <TabsTrigger value="none" className="col-span-0 hidden">None</TabsTrigger>
+                    )}
                     </TabsList>
                     
                     <TabsContent value="numeric" className="mt-4 space-y-4">
@@ -395,12 +474,14 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
                       </div>
                     </TabsContent>
                   </Tabs>
+
+                {/* Add warning if habit without tracking */}
+                {type === 'habit' && trackingType === 'none' && (
+                  <p className="text-sm text-red-500 mt-2">
+                    Habits require a tracking method to be effective.
+                  </p>
+                )}
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-muted-foreground">Tracking options are available for tasks and habits only.</p>
-                </div>
-              )}
             </>
           )}
           
@@ -416,7 +497,12 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
                 Next <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             ) : (
-              <Button type="submit">Create Task</Button>
+              <Button 
+                type="submit"
+                disabled={type === 'habit' && trackingType === 'none'} // Disable if habit without tracking
+              >
+                Create Task
+              </Button>
             )}
           </DialogFooter>
         </form>

@@ -60,7 +60,7 @@ const AppNavbar = () => {
     <nav className="bg-white dark:bg-gray-900 shadow-sm border-b">
       <div className="container px-4 py-3 mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-primary font-bold text-xl">SparkHub</span>
+          <span className="text-primary font-bold text-xl">devWithMe</span>
         </Link>
 
         {/* Mobile Menu Button */}

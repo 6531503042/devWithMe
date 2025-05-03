@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Define the TaskType using the Enum from Supabase
 type TaskType = Database['public']['Enums']['task_type'];
@@ -66,6 +67,27 @@ interface Task {
     done: boolean;
   }[];
 }
+
+const TaskSkeleton = () => (
+  <Card className="overflow-hidden border-l-4 border-l-muted">
+    <CardContent className="p-4">
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-5 w-5 rounded-full shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <Skeleton className="h-5 w-48 mb-2" />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+          </div>
+          <Skeleton className="h-4 w-full max-w-[280px] mb-3" />
+          <Skeleton className="h-10 w-full mb-2" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 const TasksPage = () => {
   const queryClient = useQueryClient();
@@ -629,39 +651,29 @@ const TasksPage = () => {
           )}
           
           {/* Loading State */}
-          {isLoading && <div className="text-center py-10">Loading tasks...</div>}
-          
-          {/* Error State */}
-          {error && (
-            <Card className="mb-6 bg-destructive/10">
-              <CardContent className="p-4 text-center text-destructive">
-                Failed to load tasks. Please try refreshing the page.
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Empty State */}
-          {!isLoading && !error && taskList.length === 0 && (
-            <Card className="mb-6">
-              <CardContent className="p-8 text-center">
-                <h3 className="text-lg font-medium mb-2">No tasks found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {filterCategory || activeTab !== 'all' 
-                    ? "Try changing your filters or " 
-                    : "Get started by "}
-                  creating a new task.
-                </p>
-                <Button onClick={() => setIsFormOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Your First Task
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Board View */}
-          {!isLoading && !error && taskList.length > 0 && viewOption === 'board' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {taskList.map(task => (
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <TaskSkeleton key={i} />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <p>Failed to load tasks. Please try again.</p>
+              <Button variant="outline" className="mt-4" onClick={() => queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] })}>
+                <RotateCcw className="h-4 w-4 mr-2" /> Retry
+              </Button>
+            </div>
+          ) : filteredTasks().length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <p>No tasks found. Create a new task to get started.</p>
+              <Button className="mt-4" onClick={() => setIsFormOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Add Task
+              </Button>
+            </div>
+          ) : viewOption === 'board' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+              {filteredTasks().map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -672,21 +684,17 @@ const TasksPage = () => {
                 />
               ))}
             </div>
-          )}
-          
-          {/* List View */}
-          {!isLoading && !error && taskList.length > 0 && viewOption === 'list' && (
-            <div className="space-y-2">
-              {taskList.map(task => (
-                <div key={task.id} className="border rounded-md hover:bg-secondary/5 transition-colors">
-                  <TaskCard
-                    task={task}
-                    onComplete={handleTaskComplete}
-                    onNumericUpdate={handleNumericUpdate}
-                    onTimerUpdate={handleTimerUpdate}
-                    onChecklistUpdate={handleChecklistUpdate}
-                  />
-                </div>
+          ) : (
+            <div className="space-y-3 mt-6">
+              {filteredTasks().map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onComplete={handleTaskComplete}
+                  onNumericUpdate={handleNumericUpdate}
+                  onTimerUpdate={handleTimerUpdate}
+                  onChecklistUpdate={handleChecklistUpdate}
+                />
               ))}
             </div>
           )}

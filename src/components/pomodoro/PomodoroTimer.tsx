@@ -10,14 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import type { Database } from '@/integrations/supabase/types';
-import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Timer } from 'lucide-react';
 
@@ -231,7 +229,10 @@ const PomodoroTimer = () => {
   const [currentSound, setCurrentSound] = useState<number>(0);
   const [isSoundPlaying, setIsSoundPlaying] = useState<boolean>(false);
   const [isGlowing, setIsGlowing] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Separate loading states for different data types
+  const [isSessionLoading, setSessionLoading] = useState(false);
+  const [isTaskLoading, setTaskLoading] = useState(false);
   const [dataError, setDataError] = useState<boolean>(false);
   
   // New state for theme and media
@@ -243,7 +244,8 @@ const PomodoroTimer = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [useRecommendedPlaylist, setUseRecommendedPlaylist] = useState<boolean>(true);
   
-  const timerRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const endTimeRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
   const glowPulseRef = useRef<NodeJS.Timeout | null>(null);
@@ -252,6 +254,74 @@ const PomodoroTimer = () => {
 
   const { user, isInitialized } = useAuth();
   const { toast } = useToast();
+
+  // Load data when component mounts and user status is resolved, but don't block UI
+  useEffect(() => {
+    if (isInitialized) {
+      fetchUserData();
+    }
+  }, [user, isInitialized]);
+
+  const fetchUserData = async () => {
+    // Only fetch if user is logged in
+    if (!user) {
+      setSessions([]);
+      setTasks([]);
+      return;
+    }
+    
+    // Set loading states without blocking UI
+    setSessionLoading(true);
+    setTaskLoading(true);
+    setDataError(false);
+    
+    try {
+      // Fetch sessions in parallel with tasks
+      const fetchSessions = async () => {
+        const { data: pomodoroData, error: pomodoroError } = await supabase
+          .from('pomodoro_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('completed_at', { ascending: false })
+          .limit(10);
+        
+        if (pomodoroError) throw pomodoroError;
+        setSessions(pomodoroData || []);
+        setSessionLoading(false);
+      };
+      
+      const fetchTasks = async () => {
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('completed', false)
+          .order('created_at', { ascending: false });
+        
+        if (tasksError) throw tasksError;
+        setTasks(tasksData || []);
+        setTaskLoading(false);
+      };
+      
+      // Execute both requests in parallel
+      await Promise.all([fetchSessions(), fetchTasks()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setDataError(true);
+      toast({
+        title: 'Error',
+        description: 'Failed to load timer data. Using default settings.',
+        variant: 'destructive'
+      });
+      
+      // Use empty data as fallback
+      setSessions([]);
+      setTasks([]);
+    } finally {
+      setSessionLoading(false);
+      setTaskLoading(false);
+    }
+  };
 
   // Initialize with the studywithme theme and apply it to body
   useEffect(() => {
@@ -428,9 +498,31 @@ const PomodoroTimer = () => {
       setShowMediaPlayer(true);
     }
     
+    // Clean up function for component unmounting
     return () => {
       if (alarmAudioRef.current) {
         alarmAudioRef.current.pause();
+        alarmAudioRef.current = null;
+      }
+      
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      
+      // Clean up theme and background
+      const existingThemeClasses = Array.from(document.body.classList)
+        .filter(cls => cls.startsWith('timer-theme-'));
+      
+      existingThemeClasses.forEach(cls => {
+        document.body.classList.remove(cls);
+      });
+      
+      // Reset background image only if the current one was set by this component
+      const currentBg = document.body.style.backgroundImage;
+      const themeImages = timerThemes.map(t => t.backgroundImage);
+      if (themeImages.some(img => currentBg.includes(img))) {
+        document.body.style.backgroundImage = '';
       }
     };
   }, []);
@@ -449,142 +541,28 @@ const PomodoroTimer = () => {
     }
   }, [selectedTheme, mediaType, useRecommendedPlaylist]);
 
-  // Load data when component mounts and user status is resolved
-  useEffect(() => {
-    if (isInitialized) {
-      fetchData();
-    }
-  }, [user, isInitialized]);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    setDataError(false);
-    
-    try {
-      // If user is logged in, fetch real data
-      if (user) {
-        // Fetch pomodoro sessions
-        const { data: pomodoroData, error: pomodoroError } = await supabase
-          .from('pomodoro_sessions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('completed_at', { ascending: false })
-          .limit(10);
-        
-        if (pomodoroError) throw pomodoroError;
-        setSessions(pomodoroData || []);
-        
-        // Fetch incomplete tasks
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('completed', false)
-          .order('created_at', { ascending: false });
-        
-        if (tasksError) throw tasksError;
-        setTasks(tasksData || []);
-      } else {
-        // Use empty data when not logged in
-        setSessions([]);
-        setTasks([]);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setDataError(true);
-      toast({
-        title: 'Error',
-        description: 'Failed to load timer data. Using default settings.',
-        variant: 'destructive'
-      });
-      
-      // Use empty data as fallback
-      setSessions([]);
-      setTasks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Reset timer when mode changes
   useEffect(() => {
     setTimeRemaining(timerModes[mode]);
     setIsActive(false);
     if (timerRef.current) {
-      cancelAnimationFrame(timerRef.current);
+      clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, [mode]);
 
-  // Handle visibility change for better cross-tab timer behavior
-  useEffect(() => {
-    // Define visibility change handler
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // When the tab becomes visible again, recalculate the timer
-        if (isActive) {
-          const savedTimerState = localStorage.getItem('pomodoro-timer-state');
-          if (savedTimerState) {
-            try {
-              const state = JSON.parse(savedTimerState);
-              // If there's an end time saved and the timer is active
-              if (state.endTime) {
-                const remaining = Math.max(0, Math.round((state.endTime - Date.now()) / 1000));
-                if (remaining > 0) {
-                  // Update the timer with the correct remaining time 
-                  setTimeRemaining(remaining);
-                } else {
-                  // Timer would have completed while tab was inactive
-                  setTimeRemaining(0);
-                  setIsActive(false);
-                  
-                  // Play alarm and record completion
-                  if (alarmAudioRef.current) {
-                    alarmAudioRef.current.currentTime = 0;
-                    alarmAudioRef.current.play().catch(e => console.log('Alarm audio play failed:', e));
-                  }
-                  
-                  const sessionDuration = timerModes[mode];
-                  if (sessionDuration > 0 && user) {
-                    saveSession(sessionDuration);
-                  } else {
-                    toast({
-                      title: 'Session Complete',
-                      description: `${mode} session completed while you were away!`,
-                      variant: 'default'
-                    });
-                  }
-                  
-                  // Clear the saved state
-                  localStorage.removeItem('pomodoro-timer-state');
-                }
-              }
-            } catch (error) {
-              console.error('Error restoring timer state:', error);
-            }
-          }
-        }
-      }
-    };
-
-    // Add event listener for visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Clean up the event listener when component unmounts
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isActive, mode, user, toast]);
-
   // Timer logic with improved exact timing
   useEffect(() => {
-    // Handle timer completion
-    const handleTimerComplete = () => {
-      // Stop the animation frame
+    // Handle timer completion - centralized in one place
+    const handleTimerCompletion = () => {
+      // Stop timer interval
       if (timerRef.current) {
-        cancelAnimationFrame(timerRef.current);
+        clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      
+      // Clear the end time reference
+      endTimeRef.current = null;
       
       // Stop glow effect
       if (glowPulseRef.current) {
@@ -611,81 +589,77 @@ const PomodoroTimer = () => {
           variant: 'default'
         });
       }
+      
+      // Remove from localStorage to prevent duplicate completions
+      localStorage.removeItem('pomodoro-timer-state');
     };
 
     if (isActive && timeRemaining > 0) {
-      // Calculate the exact end time based on current time and remaining seconds
-      const startTime = Date.now();
-      const expectedEndTime = startTime + (timeRemaining * 1000);
+      // Set endTime only when timer starts, not on every render
+      if (!endTimeRef.current) {
+        endTimeRef.current = Date.now() + (timeRemaining * 1000);
+      }
       
-      // Save current timer state to localStorage for tab visibility changes
-      const timerState = {
+      // Save current timer state to localStorage for persistence across tabs/visibility changes
+      localStorage.setItem('pomodoro-timer-state', JSON.stringify({
         mode,
-        timeRemaining,
-        isActive,
-        endTime: expectedEndTime,
+        endTime: endTimeRef.current,
+        isActive: true,
         timestamp: Date.now()
-      };
-      localStorage.setItem('pomodoro-timer-state', JSON.stringify(timerState));
+      }));
       
-      // Use requestAnimationFrame for more reliable updates
-      const updateTimer = () => {
-        // Only update if the tab is visible
-        if (document.visibilityState === 'visible') {
-          const currentTime = Date.now();
-          // Calculate remaining time based on expected end time
-          const remaining = Math.max(0, Math.round((expectedEndTime - currentTime) / 1000));
+      // Use setInterval for more reliable background execution
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => {
+          if (!endTimeRef.current) return;
           
-          // Update UI with the calculated time
+          // Calculate remaining time based on the original end time
+          const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+          
+          // Update the display
           setTimeRemaining(remaining);
           
           // Check if timer completed
           if (remaining <= 0) {
             setIsActive(false);
-            handleTimerComplete();
-            return;
+            handleTimerCompletion();
           }
-        }
-        
-        // Continue animation loop if still active
-        if (isActive) {
-          timerRef.current = requestAnimationFrame(updateTimer);
-        }
-      };
+        }, 500); // Update every 500ms for smooth display without performance impact
+      }
       
-      // Start the timer loop
-      timerRef.current = requestAnimationFrame(updateTimer);
-      
-      // Start pulsing glow effect when timer is active
-      if (glowPulseRef.current) clearInterval(glowPulseRef.current);
-      glowPulseRef.current = setInterval(() => {
-        setIsGlowing(prev => !prev);
-      }, 2000);
+      // Start pulsing glow effect
+      if (!glowPulseRef.current) {
+        glowPulseRef.current = setInterval(() => {
+          setIsGlowing(prev => !prev);
+        }, 2000);
+      }
     } else if (timeRemaining === 0) {
       // Timer completed
       setIsActive(false);
-      handleTimerComplete();
-      
-      // Clear saved state
-      localStorage.removeItem('pomodoro-timer-state');
+      handleTimerCompletion();
     } else if (!isActive) {
-      // Timer paused - update localStorage
-      const timerState = {
-        mode,
-        timeRemaining,
-        isActive: false,
-        endTime: null,
-        timestamp: Date.now()
-      };
-      localStorage.setItem('pomodoro-timer-state', JSON.stringify(timerState));
+      // Timer paused or inactive
       
-      // Stop animation frame
+      // Clear intervals when paused
       if (timerRef.current) {
-        cancelAnimationFrame(timerRef.current);
+        clearInterval(timerRef.current);
         timerRef.current = null;
       }
       
-      // Stop glow effect when paused
+      // Update localStorage for paused state if time remains
+      if (timeRemaining > 0) {
+        localStorage.setItem('pomodoro-timer-state', JSON.stringify({
+          mode,
+          timeRemaining,
+          isActive: false,
+          timestamp: Date.now()
+        }));
+      } else {
+        // Clean up localStorage if timer is reset or completed
+        localStorage.removeItem('pomodoro-timer-state');
+      }
+      
+      // Stop glow effect
       if (glowPulseRef.current) {
         clearInterval(glowPulseRef.current);
         glowPulseRef.current = null;
@@ -693,18 +667,123 @@ const PomodoroTimer = () => {
       }
     }
 
+    // Clean up function
     return () => {
       if (timerRef.current) {
-        cancelAnimationFrame(timerRef.current);
+        clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      
       if (glowPulseRef.current) {
         clearInterval(glowPulseRef.current);
         glowPulseRef.current = null;
-        setIsGlowing(false);
       }
     };
   }, [isActive, timeRemaining, mode, user, toast]);
+
+  // Handle visibility change in a separate effect with proper cleanup
+  useEffect(() => {
+    // Define visibility change handler - only update timer display when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const savedState = localStorage.getItem('pomodoro-timer-state');
+        if (savedState) {
+          try {
+            const state = JSON.parse(savedState);
+            
+            // Only process if the state matches our current mode
+            if (state.mode === mode) {
+              if (state.endTime && state.isActive) {
+                const remaining = Math.max(0, Math.round((state.endTime - Date.now()) / 1000));
+                
+                if (remaining <= 0) {
+                  // Timer would have completed while away
+                  setIsActive(false);
+                  setTimeRemaining(0);
+                  endTimeRef.current = null;
+                  localStorage.removeItem('pomodoro-timer-state');
+                  
+                  // Handle completion
+                  const sessionDuration = timerModes[mode];
+                  if (sessionDuration > 0 && user) {
+                    saveSession(sessionDuration);
+                  } else {
+                    toast({
+                      title: 'Session Complete',
+                      description: `${mode} session completed while you were away!`,
+                      variant: 'default'
+                    });
+                  }
+                } else if (isActive) {
+                  // Continue the active timer with corrected time
+                  endTimeRef.current = state.endTime;
+                  setTimeRemaining(remaining);
+                }
+              } else if (!state.isActive && state.timeRemaining) {
+                // Restore a paused timer
+                setTimeRemaining(state.timeRemaining);
+                endTimeRef.current = null;
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing timer state:', error);
+            // Fallback to clean state to avoid stuck timers
+            localStorage.removeItem('pomodoro-timer-state');
+          }
+        }
+      }
+    };
+    
+    // Add visibility event listener
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Check for a previously active timer on initial load
+    const checkSavedTimer = () => {
+      const savedState = localStorage.getItem('pomodoro-timer-state');
+      if (savedState) {
+        try {
+          const state = JSON.parse(savedState);
+          
+          // Only restore if the mode matches
+          if (state.mode === mode) {
+            if (state.endTime && state.isActive) {
+              const now = Date.now();
+              const remaining = Math.max(0, Math.round((state.endTime - now) / 1000));
+              
+              if (remaining > 0) {
+                // Resume the active timer
+                endTimeRef.current = state.endTime;
+                setTimeRemaining(remaining);
+                setIsActive(true);
+              } else {
+                // Timer would have ended while away - clean up
+                localStorage.removeItem('pomodoro-timer-state');
+                endTimeRef.current = null;
+                setTimeRemaining(0);
+                setIsActive(false);
+              }
+            } else if (!state.isActive && state.timeRemaining) {
+              // Restore paused timer state
+              setTimeRemaining(state.timeRemaining);
+              endTimeRef.current = null;
+              setIsActive(false);
+            }
+          }
+        } catch (error) {
+          console.error('Error restoring timer state:', error);
+          // Clean up to avoid stuck state
+          localStorage.removeItem('pomodoro-timer-state');
+        }
+      }
+    };
+    
+    // Run the check on component mount
+    checkSavedTimer();
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [mode, timerModes, user, toast, isActive]);
 
   // Handle ambient sound
   useEffect(() => {
@@ -758,7 +837,7 @@ const PomodoroTimer = () => {
       if (error) throw error;
       
       // Refresh sessions list
-      await fetchData();
+      await fetchUserData();
       
       toast({
         title: 'Session Complete',
@@ -780,10 +859,16 @@ const PomodoroTimer = () => {
   };
 
   const resetTimer = () => {
+    // Update state
     setTimeRemaining(timerModes[mode]);
     setIsActive(false);
+    
+    // Clear end time reference
+    endTimeRef.current = null;
+    
+    // Clean up intervals
     if (timerRef.current) {
-      cancelAnimationFrame(timerRef.current);
+      clearInterval(timerRef.current);
       timerRef.current = null;
     }
     
@@ -793,6 +878,9 @@ const PomodoroTimer = () => {
       glowPulseRef.current = null;
       setIsGlowing(false);
     }
+    
+    // Clean up localStorage to avoid stuck states
+    localStorage.removeItem('pomodoro-timer-state');
   };
 
   const toggleSound = () => {
@@ -866,10 +954,9 @@ const PomodoroTimer = () => {
     }
   };
   
-  // Enhanced isDarkTheme function using the explicit isDark property
+  // Enhanced isDarkTheme function to properly handle all theme types
   const isDarkTheme = (themeId: ThemeOption): boolean => {
-    const theme = timerThemes.find(t => t.id === themeId);
-    return theme?.isDark ?? ['studywithme', 'library', 'dark-academic', 'default'].includes(themeId);
+    return ['studywithme', 'library', 'dark-academic', 'default'].includes(themeId);
   };
   
   // Helper function to get appropriate font color class based on theme
@@ -885,15 +972,23 @@ const PomodoroTimer = () => {
     return 'text-black bg-white/30 hover:bg-black/20';
   };
   
+  // Keep tab text consistent across all themes
+  const getTabTextColorClass = () => {
+    return 'text-neutral-800';
+  };
+  
   // Get appropriate timer display shadow class based on theme
   const getTimerDisplayShadowClass = () => {
     return isDarkTheme(selectedTheme) ? 'text-shadow-dark' : 'text-shadow-light';
   };
   
-  // Helper to get appropriate tab text color
-  const getTabTextColorClass = () => {
-    // Default to neutral-800 for better readability on all backgrounds
-    return 'text-neutral-800';
+  // Get appropriate input style class based on theme for consistent UI
+  const getInputStyleClass = () => {
+    if (isDarkTheme(selectedTheme)) {
+      return 'bg-black/30 border-white/20 text-white placeholder:text-gray-400';
+    } else {
+      return 'bg-white/30 border-black/20 text-black placeholder:text-gray-600';
+    }
   };
   
   // Handle theme change function to properly manage body classes  
@@ -977,8 +1072,19 @@ const PomodoroTimer = () => {
   // Get Spotify embed URL from a Spotify URL
   const getSpotifyEmbedUrl = (url: string) => {
     try {
+      // Handle empty URL
+      if (!url || url.trim() === '') {
+        // Use lofi beats as fallback
+        return 'https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRwui0ExPn';
+      }
+      
       // Handle different Spotify URL formats
       let embedUrl = url;
+      
+      // If it's already an embed URL, return it
+      if (url.includes('open.spotify.com/embed/')) {
+        return url;
+      }
       
       // Convert spotify:track:id format
       if (url.startsWith('spotify:')) {
@@ -999,34 +1105,70 @@ const PomodoroTimer = () => {
         }
       }
       
+      // Ensure we have properly formatted embed URL
+      if (!embedUrl.includes('open.spotify.com/embed/')) {
+        console.error('Could not create valid embed URL from:', url);
+        // Fallback to lofi beats
+        return 'https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRwui0ExPn';
+      }
+      
+      // Add compact UI and theme parameters
+      if (!embedUrl.includes('?')) {
+        embedUrl += '?';
+      } else {
+        embedUrl += '&';
+      }
+      embedUrl += 'utm_source=generator&theme=0';
+      
       return embedUrl;
     } catch (e) {
       console.error('Error parsing Spotify URL:', e);
-      return url;
+      // Fallback to lofi beats
+      return 'https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRwui0ExPn';
     }
   };
   
-  // Parse YouTube URL to get embed code
+  // Improve the getYoutubeEmbedUrl function to handle errors better
   const getYoutubeEmbedUrl = (url: string) => {
     try {
+      // Handle empty URL
+      if (!url || url.trim() === '') {
+        // Use lofi girl as fallback
+        return 'https://www.youtube.com/embed/jfKfPfyJRdk?controls=1&autoplay=0&modestbranding=1&rel=0';
+      }
+      
+      // If it's already an embed URL, return it with additional parameters
+      if (url.includes('youtube.com/embed/')) {
+        const baseUrl = url.split('?')[0];
+        return `${baseUrl}?controls=1&autoplay=0&modestbranding=1&rel=0`;
+      }
+      
       let videoId = '';
       
       // Extract video ID from URL
       if (url.includes('youtube.com/watch')) {
-        const urlParams = new URLSearchParams(new URL(url).search);
-        videoId = urlParams.get('v') || '';
+        try {
+          const urlParams = new URLSearchParams(new URL(url).search);
+          videoId = urlParams.get('v') || '';
+        } catch (e) {
+          // Fallback for invalid URLs
+          const match = url.match(/[?&]v=([^&]+)/);
+          videoId = match ? match[1] : '';
+        }
       } else if (url.includes('youtu.be/')) {
-        videoId = url.split('youtu.be/')[1].split('?')[0];
+        videoId = url.split('youtu.be/')[1]?.split('?')[0] || '';
       }
       
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}?controls=1&autoplay=0`;
+      if (!videoId) {
+        // Return a default for invalid URLs
+        return 'https://www.youtube.com/embed/jfKfPfyJRdk?controls=1&autoplay=0&modestbranding=1&rel=0';
       }
       
-      return url;
-    } catch (e) {
-      console.error('Error parsing YouTube URL:', e);
-      return url;
+      return `https://www.youtube.com/embed/${videoId}?controls=1&autoplay=0&modestbranding=1&rel=0`;
+    } catch (error) {
+      console.error('Error parsing YouTube URL:', error);
+      // Return default on any error
+      return 'https://www.youtube.com/embed/jfKfPfyJRdk?controls=1&autoplay=0&modestbranding=1&rel=0';
     }
   };
   
@@ -1084,6 +1226,8 @@ const PomodoroTimer = () => {
 
   // Define timer functions
   const startTimer = () => {
+    // Clear any previously set end time when starting timer
+    endTimeRef.current = null;
     setIsActive(true);
   };
   
@@ -1138,81 +1282,291 @@ const PomodoroTimer = () => {
     };
   }, [isSettingsOpen]);
 
-  if (isLoading) {
-    return (
-      <Card className="bg-transparent backdrop-blur-md border-none shadow-none max-w-3xl mx-auto">
-        <CardContent className="p-6 relative z-10">
-          <div className="timer-loading-indicator">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className={isDarkTheme(selectedTheme) ? 'text-white' : 'text-black'}>Loading timer data...</span>
-          </div>
-          
-          <div className="w-full flex justify-center my-6">
-            <div className={`timer-display text-6xl md:text-8xl font-bold p-6 md:p-8 rounded-2xl text-center w-64 md:w-80 backdrop-blur-lg opacity-50 ${getFontColorClass()}`}>
-              {formatTime(timerModes[mode])}
-            </div>
-          </div>
-          
-          <div className="flex justify-center gap-3">
-            <Button
-              variant="outline"
-              size="lg"
-              className={`w-32 h-14 font-medium backdrop-blur-lg opacity-50 ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white' : 'bg-white/20 text-black'}`}
-              disabled
-            >
-              <Play className="h-5 w-5 mr-2" />
-              Start
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className={`w-32 h-14 font-medium backdrop-blur-lg opacity-50 ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white' : 'bg-white/20 text-black'}`}
-              disabled
-            >
-              <RefreshCw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Add custom scrollbar CSS to remove visible scrollbar
+  useEffect(() => {
+    // Add custom scrollbar styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+      }
+      .custom-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Add custom CSS for the media player with more reliable cleanup
+  useEffect(() => {
+    // Add custom media player styles
+    const styleId = 'pomodoro-media-player-styles';
+    let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+    
+    if (!styleElement) {
+      styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      document.head.appendChild(styleElement);
+    }
+    
+    styleElement.textContent = `
+      /* Media Player Styles */
+      .media-player-container {
+        transition: all 0.3s ease-in-out;
+        max-height: 500px;
+        overflow: hidden;
+      }
+      
+      .media-player-container.collapsed {
+        max-height: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        opacity: 0;
+      }
+      
+      .spotify-container iframe,
+      .youtube-container iframe {
+        background: rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        opacity: 0.95;
+        transition: opacity 0.3s ease;
+        border-radius: 8px;
+      }
+      
+      .spotify-container iframe:hover,
+      .youtube-container iframe:hover {
+        opacity: 1;
+      }
+      
+      .playlist-scroller {
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 5px;
+      }
+      
+      .playlist-scroller::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .playlist-button {
+        transition: all 0.2s ease;
+      }
+      
+      .playlist-button:hover {
+        transform: translateY(-2px);
+      }
+      
+      /* Timer Theme specific styles */
+      .timer-theme-studywithme .timer-display {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      
+      .timer-theme-minimal .timer-display {
+        text-shadow: none;
+      }
+      
+      .timer-theme-dark-academic .timer-display,
+      .timer-theme-library .timer-display {
+        text-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+      }
+      
+      /* Music player tab styles */
+      .timer-tabs .music-tab-active {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    `;
+    
+    return () => {
+      // More careful cleanup of styles
+      if (styleElement && document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
+    };
+  }, []);
+
+  // Initialize theme and background with better error handling
+  useEffect(() => {
+    const applyTheme = (themeId: ThemeOption) => {
+      try {
+        // Reset any existing theme classes to ensure a clean start
+        document.body.className = document.body.className
+          .split(' ')
+          .filter(cls => !cls.startsWith('timer-theme-'))
+          .join(' ');
+        
+        // Find theme configuration
+        const themeConfig = timerThemes.find(t => t.id === themeId);
+        if (!themeConfig) {
+          console.warn(`Theme ${themeId} not found, falling back to default`);
+          document.body.classList.add('timer-theme-studywithme');
+          return;
+        }
+        
+        // Apply the theme class
+        document.body.classList.add(`timer-theme-${themeId}`);
+        
+        // Apply background image if available
+        if (themeConfig.backgroundImage) {
+          document.body.style.backgroundImage = `url(${themeConfig.backgroundImage})`;
+          document.body.style.backgroundSize = 'cover';
+          document.body.style.backgroundPosition = 'center';
+          document.body.style.backgroundAttachment = 'fixed';
+        }
+      } catch (error) {
+        console.error('Error applying theme:', error);
+        // Fallback to a minimal theme to ensure functionality
+        document.body.classList.add('timer-theme-minimal');
+      }
+    };
+    
+    // Try to load saved preference from localStorage or default to studywithme
+    try {
+      const savedTheme = localStorage.getItem('pomodoro-theme') as ThemeOption || 'studywithme';
+      setSelectedTheme(savedTheme);
+      applyTheme(savedTheme);
+      
+      // Load media preferences
+      const savedSpotifyUrl = localStorage.getItem('pomodoro-spotify-url');
+      if (savedSpotifyUrl) {
+        setSpotifyUrl(savedSpotifyUrl);
+      } else {
+        // Set default playlist based on theme
+        const themePlaylist = timerThemes.find(t => t.id === savedTheme)?.recommendedPlaylist?.spotify || '';
+        setSpotifyUrl(themePlaylist);
+      }
+      
+      const savedYoutubeUrl = localStorage.getItem('pomodoro-youtube-url');
+      if (savedYoutubeUrl) {
+        setYoutubeUrl(savedYoutubeUrl);
+      } else {
+        // Set default playlist based on theme
+        const themePlaylist = timerThemes.find(t => t.id === savedTheme)?.recommendedPlaylist?.youtube || '';
+        setYoutubeUrl(themePlaylist);
+      }
+      
+      const savedMediaType = localStorage.getItem('pomodoro-media-type');
+      if (savedMediaType === 'spotify' || savedMediaType === 'youtube') {
+        setMediaType(savedMediaType);
+      }
+      
+      const savedShowMediaPlayer = localStorage.getItem('pomodoro-show-media');
+      if (savedShowMediaPlayer) {
+        setShowMediaPlayer(savedShowMediaPlayer === 'true');
+      } else {
+        // Default to showing media player for better UX
+        setShowMediaPlayer(true);
+      }
+    } catch (error) {
+      console.error('Error loading theme preferences:', error);
+      // Apply safe fallback
+      setSelectedTheme('minimal');
+      applyTheme('minimal');
+    }
+    
+    // Initialize alarm sound with error handling
+    try {
+      if (!alarmAudioRef.current) {
+        alarmAudioRef.current = new Audio(ALARM_SOUND_URL);
+        alarmAudioRef.current.volume = 0.7;
+      }
+    } catch (error) {
+      console.error('Error initializing alarm sound:', error);
+    }
+    
+    // Clean up function for component unmounting
+    return () => {
+      try {
+        // Clean up audio elements
+        if (alarmAudioRef.current) {
+          alarmAudioRef.current.pause();
+          alarmAudioRef.current.src = '';
+          alarmAudioRef.current = null;
+        }
+        
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+          audioRef.current = null;
+        }
+        
+        // Clean up theme and background
+        const existingThemeClasses = Array.from(document.body.classList)
+          .filter(cls => cls.startsWith('timer-theme-'));
+        
+        existingThemeClasses.forEach(cls => {
+          document.body.classList.remove(cls);
+        });
+        
+        // Reset background image only if the current one was set by this component
+        const currentBg = document.body.style.backgroundImage;
+        const themeImages = timerThemes.map(t => t.backgroundImage);
+        if (themeImages.some(img => currentBg.includes(img))) {
+          document.body.style.backgroundImage = '';
+        }
+        
+        // Clean up any timers
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        
+        if (glowPulseRef.current) {
+          clearInterval(glowPulseRef.current);
+          glowPulseRef.current = null;
+        }
+        
+        // Remove any stale state from localStorage
+        localStorage.removeItem('pomodoro-timer-state');
+      } catch (error) {
+        console.error('Error during cleanup:', error);
+      }
+    };
+  }, []);
 
   return (
     <Card className="bg-transparent backdrop-blur-md border-none shadow-none max-w-3xl mx-auto">
       <CardContent className="p-6 relative z-10">
         <div className="flex flex-col items-center">
           <div className="flex items-center justify-between w-full mb-4">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className={`relative z-20 backdrop-blur-md border border-gray-500/30 ${getSettingsIconClass()}`}
-                  aria-label="Open Settings"
-                  title="Settings"
-                  onClick={() => setIsSettingsOpen(true)}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className={`relative z-20 backdrop-blur-md border border-gray-500/30 ${getSettingsIconClass()}`}
+              aria-label="Open Settings"
+              title="Settings"
+              onClick={() => setIsSettingsOpen(true)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
             
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <DialogContent 
-                className="settings-panel bg-black/80 text-white max-h-[80vh] overflow-y-auto w-[450px] max-w-[95vw]"
+                className="settings-panel bg-black/80 text-white fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-hidden w-[450px] max-w-[95vw] border border-white/10 rounded-xl flex flex-col"
               >
-                <DialogHeader className="sticky top-0 bg-black/80 backdrop-blur-md z-10 pb-2 pt-1">
+                <DialogHeader className="sticky top-0 bg-black/90 backdrop-blur-md z-30 pb-2 pt-4 px-6 border-b border-white/10">
                   <div className="flex justify-between items-center">
                     <DialogTitle className="font-medium text-lg text-white">Timer Settings</DialogTitle>
                     <Button 
                       variant="ghost" 
-                      size="sm" 
-                      className="h-8 w-8 p-0 rounded-full text-white hover:bg-white/10" 
-                      onClick={() => setIsSettingsOpen(false)}
+                      size="icon" 
+                      onClick={() => setIsSettingsOpen(false)} 
+                      className="absolute right-4 top-3 z-50 text-white hover:bg-white/20 rounded-full h-8 w-8 p-0"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </DialogHeader>
                   
-                <div className="settings-content space-y-4 mt-2 pr-2">
+                <div className="settings-content space-y-4 mt-2 px-6 py-4 overflow-y-auto max-h-[calc(85vh-80px)] custom-scrollbar flex-1"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div className="space-y-2">
                     <h4 className="font-medium flex items-center gap-2 text-sm">
                       <Palette className="h-4 w-4" /> Theme
@@ -1304,11 +1658,11 @@ const PomodoroTimer = () => {
                   
                   <div className="space-y-2">
                     <h4 className="font-medium flex items-center gap-2 text-sm">
-                      <Volume2 className="h-4 w-4" /> Audio
+                      <Volume2 className="h-4 w-4" /> Audio Settings
                     </h4>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="alarm-volume" className="text-xs">Alarm Volume</Label>
+                        <Label htmlFor="alarm-volume" className="text-xs">Timer Alarm Volume</Label>
                         <Slider
                           id="alarm-volume"
                           value={[0.7 * 100]}
@@ -1322,118 +1676,6 @@ const PomodoroTimer = () => {
                           className="w-32"
                         />
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="ambient-sound" className="text-xs">Ambient Sound</Label>
-                        <Select value={currentSound.toString()} onValueChange={(value) => handleAmbientSoundChange(parseInt(value))}>
-                          <SelectTrigger id="ambient-sound" className="w-32 h-8 bg-black/20 border-none">
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-black/90 border-none">
-                            {ambientSounds.map((sound, index) => (
-                              <SelectItem key={index} value={index.toString()}>
-                                {sound.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="ambient-volume" className="text-xs">Ambient Volume</Label>
-                        <Slider
-                          id="ambient-volume"
-                          value={[0.5 * 100]}
-                          onValueChange={(value) => {
-                            if (audioRef.current) {
-                              audioRef.current.volume = value[0] / 100;
-                            }
-                          }}
-                          max={100}
-                          step={1}
-                          className="w-32"
-                          disabled={currentSound === 0}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-medium flex items-center gap-2 text-sm">
-                      <Music className="h-4 w-4" /> Music Player
-                    </h4>
-                    <div className="space-y-3">
-                      <div className="grid gap-2">
-                        <Label htmlFor="player-type" className="text-xs">Player Type</Label>
-                        <Tabs 
-                          value={mediaType} 
-                          onValueChange={(value) => {
-                            setMediaType(value as any);
-                            
-                            // Update local storage
-                            localStorage.setItem('pomodoro-player-type', value);
-                          }}
-                          className="w-full timer-tabs"
-                        >
-                          <TabsList className="grid grid-cols-3 w-full">
-                            <TabsTrigger value="none">None</TabsTrigger>
-                            <TabsTrigger value="spotify">Spotify</TabsTrigger>
-                            <TabsTrigger value="youtube">YouTube</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                      </div>
-                      
-                      {mediaType === 'spotify' && (
-                        <div className="grid gap-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="use-recommended" className="text-xs">Use Recommended Playlist</Label>
-                            <Switch 
-                              id="use-recommended" 
-                              checked={useRecommendedPlaylist}
-                              onCheckedChange={setUseRecommendedPlaylist}
-                            />
-                          </div>
-                          
-                          {!useRecommendedPlaylist && (
-                            <div className="grid gap-2">
-                              <Label htmlFor="spotify-url" className="text-xs">Spotify URL or Embed Code</Label>
-                              <Input
-                                id="spotify-url"
-                                value={spotifyUrl}
-                                onChange={(e) => setSpotifyUrl(e.target.value)}
-                                placeholder="https://open.spotify.com/playlist/..."
-                                className="h-8 bg-black/20 border-none"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {mediaType === 'youtube' && (
-                        <div className="grid gap-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="use-recommended-yt" className="text-xs">Use Recommended Stream</Label>
-                            <Switch 
-                              id="use-recommended-yt" 
-                              checked={useRecommendedPlaylist}
-                              onCheckedChange={setUseRecommendedPlaylist}
-                            />
-                          </div>
-                          
-                          {!useRecommendedPlaylist && (
-                            <div className="grid gap-2">
-                              <Label htmlFor="youtube-url" className="text-xs">YouTube URL or Embed Code</Label>
-                              <Input
-                                id="youtube-url"
-                                value={youtubeUrl}
-                                onChange={(e) => setYoutubeUrl(e.target.value)}
-                                placeholder="https://www.youtube.com/watch?v=..."
-                                className="h-8 bg-black/20 border-none"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                   
@@ -1444,6 +1686,18 @@ const PomodoroTimer = () => {
                     Save & Close
                   </Button>
                 </div>
+
+                {/* Add global styles for dialog inputs */}
+                <style dangerouslySetInnerHTML={{
+                  __html: `
+                    .settings-panel input {
+                      color: white !important;
+                    }
+                    .settings-panel input::placeholder {
+                      color: rgba(156, 163, 175, 0.8) !important;
+                    }
+                  `
+                }} />
               </DialogContent>
             </Dialog>
             
@@ -1457,10 +1711,11 @@ const PomodoroTimer = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              className={`backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20`}
+              className={`toggle-player-button backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20 ${showMediaPlayer ? 'active' : ''}`}
               onClick={() => setShowMediaPlayer(!showMediaPlayer)}
+              title={showMediaPlayer ? "Hide Media Player" : "Show Media Player"}
             >
-              {showMediaPlayer ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              <Music className="h-4 w-4" />
             </Button>
           </div>
 
@@ -1515,14 +1770,124 @@ const PomodoroTimer = () => {
             </Button>
           </div>
           
-          {/* Attribution for studywithme.io */}
-          {selectedTheme === 'studywithme' && (
-            <div className="fixed bottom-4 right-4 text-white/50 text-xs font-light">
-              <p>Inspired by studywithme.io</p>
-            </div>
-          )}
         </div>
       </CardContent>
+
+      {/* Music Player Section - Improved UI */}
+      <div className={`mt-3 px-6 pb-6 transition-all duration-300 ${!showMediaPlayer ? 'hidden' : ''}`}>
+        <div className="music-player-section rounded-xl backdrop-blur-md p-5 border border-gray-400/20 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className={`text-lg font-medium ${getFontColorClass()}`}>Music Player</h3>
+          </div>
+          
+          <Tabs 
+            value={mediaType} 
+            onValueChange={(value) => setMediaType(value as 'spotify' | 'youtube')}
+            className="w-full"
+          >
+            <div className="flex justify-end mb-2">
+              <TabsList className="h-8">
+                <TabsTrigger value="spotify" className="text-xs px-3 h-8">
+                  <span className="flex items-center gap-1">
+                    <Music className="h-3 w-3" />
+                    <span>Spotify</span>
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="youtube" className="text-xs px-3 h-8">
+                  <span className="flex items-center gap-1">
+                    <Youtube className="h-3 w-3" />
+                    <span>YouTube</span>
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="spotify" className="p-0 m-0">
+              <div className="spotify-container mb-4 bg-black/5 rounded-lg p-1">
+                <iframe 
+                  ref={spotifyEmbedRef}
+                  src={getSpotifyEmbedUrl(spotifyUrl)}
+                  width="100%" 
+                  height="152" 
+                  frameBorder="0" 
+                  allow="encrypted-media"
+                  className="rounded-lg shadow-md"
+                ></iframe>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="youtube" className="p-0 m-0">
+              <div className="youtube-container mb-4 bg-black/5 rounded-lg p-1">
+                <iframe 
+                  ref={youtubeEmbedRef}
+                  width="100%" 
+                  height="240" 
+                  src={getYoutubeEmbedUrl(youtubeUrl)}
+                  frameBorder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen
+                  className="rounded-lg shadow-md"
+                ></iframe>
+              </div>
+              <div className="mt-3 mb-1">
+                <Input
+                  placeholder="Paste YouTube URL to change the player"
+                  value={youtubeUrl}
+                  onChange={(e) => {
+                    setYoutubeUrl(e.target.value);
+                    if (youtubeEmbedRef.current && e.target.value) {
+                      youtubeEmbedRef.current.src = getYoutubeEmbedUrl(e.target.value);
+                      saveMediaUrls();
+                    }
+                  }}
+                  className={`h-8 text-sm ${getInputStyleClass()}`}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          {/* Quick Playlists */}
+          <div className="mt-4">
+            <Label className={`text-sm font-medium block mb-2 ${getFontColorClass()}`}>Recommended Playlists</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {popularPlaylists.slice(0, 8).map((playlist, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  className={`playlist-button h-10 text-xs flex items-center justify-center ${
+                    isDarkTheme(selectedTheme) 
+                      ? 'bg-black/20 hover:bg-white/10 text-white border-white/20' 
+                      : 'bg-white/20 hover:bg-black/10 text-black border-black/20'
+                  }`}
+                  onClick={() => {
+                    if (mediaType === 'spotify') {
+                      setSpotifyUrl(playlist.spotify);
+                      if (spotifyEmbedRef.current) {
+                        spotifyEmbedRef.current.src = getSpotifyEmbedUrl(playlist.spotify);
+                      }
+                    } else {
+                      setYoutubeUrl(playlist.youtube);
+                      if (youtubeEmbedRef.current) {
+                        youtubeEmbedRef.current.src = getYoutubeEmbedUrl(playlist.youtube);
+                      }
+                    }
+                    setUseRecommendedPlaylist(false);
+                    saveMediaUrls();
+                  }}
+                >
+                  <span className="truncate">{playlist.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Attribution */}
+          <div className="text-right mt-4">
+            <p className="text-xs text-gray-400">Inspired by devwithme</p>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 };

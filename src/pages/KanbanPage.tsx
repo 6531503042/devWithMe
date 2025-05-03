@@ -12,6 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+import { useKanbanBoards } from '@/hooks/use-cached-data';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface KanbanBoardMeta {
   id: string;
@@ -21,36 +25,26 @@ interface KanbanBoardMeta {
 const KanbanPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isBoardDialogOpen, setIsBoardDialogOpen] = useState(false);
-  const [boards, setBoards] = useState<KanbanBoardMeta[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Use our new hook to fetch and cache kanban boards data
+  const { 
+    data: boards = [],
+    isLoading,
+    error,
+    refetch
+  } = useKanbanBoards();
 
+  // Set the first board as selected if we've loaded boards and none is selected
   useEffect(() => {
-    if (user) fetchBoards();
-  }, [user]);
-
-  const fetchBoards = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('kanban_boards')
-        .select('id, title')
-        .eq('user_id', user.id)
-        .order('created_at');
-      if (error) throw error;
-      setBoards(data || []);
-      if (data && data.length > 0 && !selectedBoardId) {
-        setSelectedBoardId(data[0].id);
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load boards',
-        variant: 'destructive',
-      });
+    if (boards.length > 0 && !selectedBoardId) {
+      setSelectedBoardId(boards[0].id);
     }
-  };
+  }, [boards, selectedBoardId]);
 
   const handleCreateBoard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +61,10 @@ const KanbanPage = () => {
       toast({ title: 'Board created', description: 'New board added!' });
       setNewBoardTitle('');
       setIsBoardDialogOpen(false);
-      fetchBoards();
+      
+      // Invalidate the boards query to trigger a refetch
+      queryClient.invalidateQueries({ queryKey: ['kanban_boards', user.id] });
+      
       if (data && data.length > 0) setSelectedBoardId(data[0].id);
     } catch (error) {
       toast({
@@ -77,6 +74,49 @@ const KanbanPage = () => {
       });
     }
   };
+
+  const KanbanSkeleton = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[1, 2, 3].map((colIndex) => (
+          <div key={colIndex} className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 w-6 rounded-full" />
+            </div>
+            
+            <div className="space-y-3">
+              {Array.from({ length: 2 + colIndex % 2 }).map((_, cardIndex) => (
+                <Card key={cardIndex} className="relative">
+                  <CardContent className="p-3">
+                    <Skeleton className="h-5 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-full mb-3" />
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-6 w-6 rounded-full" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            <div className="mt-3">
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Handle errors from the data fetch
+  if (error) {
+    toast({
+      title: 'Error',
+      description: 'Failed to load boards. Please try again.',
+      variant: 'destructive',
+    });
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -109,9 +149,13 @@ const KanbanPage = () => {
           </div>
 
           {selectedBoardId ? (
-            <KanbanBoard 
-              boardId={selectedBoardId} 
-            />
+            isLoading ? (
+              <KanbanSkeleton />
+            ) : (
+              <KanbanBoard 
+                boardId={selectedBoardId} 
+              />
+            )
           ) : (
             <div className="text-center text-muted-foreground py-12">
               No board selected. Create a new board to get started.
@@ -155,43 +199,22 @@ const KanbanPage = () => {
                   <Label htmlFor="title">Title</Label>
                   <Input 
                     id="title"
-                    placeholder="Card title"
-                    required
+                    placeholder="Enter card title" 
                   />
                 </div>
-                
                 <div className="grid gap-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description (optional)</Label>
                   <Textarea 
                     id="description"
-                    placeholder="Card description"
+                    placeholder="Enter description" 
                     rows={3}
                   />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="dueDate">Due Date (optional)</Label>
-                    <Input 
-                      id="dueDate"
-                      type="date"
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="tags">Tags (comma separated)</Label>
-                    <Input 
-                      id="tags"
-                      placeholder="frontend, bug, critical"
-                    />
-                  </div>
-                </div>
-                
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" onClick={() => setIsDialogOpen(false)}>Add Card</Button>
+                  <Button type="submit">Add Card</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
