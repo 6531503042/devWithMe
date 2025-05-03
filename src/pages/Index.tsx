@@ -1,101 +1,70 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import AppNavbar from '@/components/layout/AppNavbar';
-import AppFooter from '@/components/layout/AppFooter';
-import PageContainer from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, LogIn } from 'lucide-react'; 
 import { useAuth } from '@/components/auth/AuthProvider';
-
-const features = [
-  {
-    title: "Task Management",
-    description: "Organize your tasks, set priorities, and track progress.",
-    link: "/tasks",
-    linkText: "Manage Tasks",
-  },
-  {
-    title: "Pomodoro Timer",
-    description: "Stay focused with a time management technique.",
-    link: "/pomodoro",
-    linkText: "Start Timer",
-  },
-  {
-    title: "Dashboard Analytics",
-    description: "Visualize your productivity with charts and statistics.",
-    link: "/dashboard",
-    linkText: "View Dashboard",
-  },
-  {
-    title: "Financial Tracking",
-    description: "Keep track of your expenses and income.",
-    link: "/finance",
-    linkText: "Track Finances",
-  }
-];
+import PageContainer from '@/components/layout/PageContainer';
+import { CheckCircle, Clock, ListChecks, BarChart } from 'lucide-react';
 
 const Index = () => {
   const { user } = useAuth();
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <AppNavbar />
-      
-      <main className="flex-1">
-        <section className="bg-gradient-to-b from-white to-gray-100 dark:from-gray-900 dark:to-gray-800 py-16">
-          <PageContainer>
-            <div className="text-center max-w-3xl mx-auto">
-              <h1 className="text-4xl font-bold mb-6">Boost Your Productivity with SparkHub</h1>
-              <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
-                The all-in-one productivity solution to manage tasks, track time, and achieve your goals.
-              </p>
-              
-              <div className="flex flex-wrap justify-center gap-4">
-                {user ? (
-                  <Button asChild size="lg">
-                    <Link to="/tasks">
-                      Go to Tasks
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button asChild size="lg">
-                    <Link to="/auth">
-                      Login / Sign Up
-                      <LogIn className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
+    <PageContainer title="Welcome to TaskManager">
+      <div className="py-10">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold mb-4">TaskManager</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Your all-in-one productivity solution to manage tasks, track habits, and boost focus with Pomodoro.
+          </p>
+          
+          <div className="flex justify-center gap-4 mt-8">
+            {user ? (
+              <Link to="/tasks">
+                <Button size="lg">Go to Tasks</Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button size="lg">Get Started</Button>
+                </Link>
+                <Link to="/auth">
+                  <Button variant="outline" size="lg">Login</Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <CheckCircle className="w-10 h-10 text-green-500 mb-4" />
+              <h2 className="text-xl font-bold mb-2">Task Management</h2>
+              <p className="text-gray-600">Create, organize and track your tasks with ease. Set due dates, priorities, and categories.</p>
             </div>
-          </PageContainer>
-        </section>
-        
-        <section className="py-16">
-          <PageContainer>
-            <h2 className="text-3xl font-bold mb-10 text-center">Key Features</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {features.map((feature, index) => (
-                <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">{feature.description}</p>
-                  <Button asChild variant="outline">
-                    <Link to={user ? feature.link : "/auth"}>
-                      {feature.linkText}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-              ))}
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <Clock className="w-10 h-10 text-blue-500 mb-4" />
+              <h2 className="text-xl font-bold mb-2">Pomodoro Timer</h2>
+              <p className="text-gray-600">Boost your productivity with the Pomodoro technique. Work in focused intervals with timed breaks.</p>
             </div>
-          </PageContainer>
-        </section>
-      </main>
-      
-      <AppFooter />
-    </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <ListChecks className="w-10 h-10 text-purple-500 mb-4" />
+              <h2 className="text-xl font-bold mb-2">Habit Tracking</h2>
+              <p className="text-gray-600">Build better habits with daily tracking, streaks, and progress visualization.</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <BarChart className="w-10 h-10 text-orange-500 mb-4" />
+              <h2 className="text-xl font-bold mb-2">Insightful Analytics</h2>
+              <p className="text-gray-600">Understand your productivity patterns with detailed statistics and visualizations.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PageContainer>
   );
 };
 

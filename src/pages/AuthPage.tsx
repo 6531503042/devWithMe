@@ -72,9 +72,17 @@ const AuthPage = () => {
     setLoading(true);
     
     try {
+      // Use signUp with emailRedirectTo option set to the same page
+      // This will bypass email confirmation if disabled in Supabase settings
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin + '/auth',
+          data: {
+            email: email,
+          }
+        }
       });
       
       if (error) {
@@ -86,10 +94,18 @@ const AuthPage = () => {
         return;
       }
       
-      if (data) {
+      if (data.session) {
+        // If session is available, user is already logged in (email confirmation disabled)
         toast({
           title: "Signup successful",
-          description: "Please check your email to verify your account, or proceed to login if email verification is disabled.",
+          description: "You're now logged in!",
+        });
+        navigate('/tasks');
+      } else {
+        // Email confirmation is enabled
+        toast({
+          title: "Signup successful",
+          description: "Please check your email to verify your account.",
         });
         setTab('login');
       }
