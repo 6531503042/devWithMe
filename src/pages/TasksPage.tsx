@@ -9,8 +9,21 @@ import { Plus } from 'lucide-react';
 import TaskCard from '@/components/tasks/TaskCard';
 import TaskForm from '@/components/tasks/TaskForm';
 
+// Define the TaskType and Task interface to ensure type safety
+type TaskType = 'task' | 'habit' | 'recurring';
+
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  type: TaskType;
+  category?: string;
+  dueDate?: Date;
+}
+
 const TasksPage = () => {
-  const [tasks, setTasks] = useState([
+  const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
       title: 'Complete project proposal',
@@ -48,7 +61,7 @@ const TasksPage = () => {
   ]);
   
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState<'all' | TaskType>('all');
   
   const handleTaskComplete = (id: string, completed: boolean) => {
     setTasks(tasks.map(task => 
@@ -56,7 +69,7 @@ const TasksPage = () => {
     ));
   };
   
-  const handleAddTask = (newTask: any) => {
+  const handleAddTask = (newTask: Task) => {
     setTasks([...tasks, newTask]);
   };
   
@@ -72,7 +85,7 @@ const TasksPage = () => {
       <main className="flex-1">
         <PageContainer title="Task Manager">
           <div className="mb-6 flex justify-between items-center">
-            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
+            <Tabs defaultValue="all" value={activeTab} onValueChange={(value: 'all' | TaskType) => setActiveTab(value)} className="w-full max-w-md">
               <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="task">Tasks</TabsTrigger>

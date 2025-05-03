@@ -6,13 +6,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Calendar, RefreshCw } from 'lucide-react';
 
+type TaskType = 'task' | 'habit' | 'recurring';
+
 interface TaskCardProps {
   task: {
     id: string;
     title: string;
     description?: string;
     completed: boolean;
-    type: 'task' | 'habit' | 'recurring';
+    type: TaskType;
     category?: string;
     dueDate?: Date;
   };

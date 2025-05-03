@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+// Define the task type as a union of literal strings
+type TaskType = 'task' | 'habit' | 'recurring';
+
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -16,7 +19,7 @@ interface TaskFormProps {
 const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState('task');
+  const [type, setType] = useState<TaskType>('task');
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
 
@@ -80,7 +83,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit }: TaskFormProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="type">Type</Label>
-              <Select value={type} onValueChange={setType}>
+              <Select value={type} onValueChange={(value: TaskType) => setType(value)}>
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
