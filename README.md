@@ -64,10 +64,10 @@ If you want to run the project locally:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/spark-dev-hub.git
+git clone https://github.com/6531503042/devWithMe.git
 
 # Navigate to the project directory
-cd spark-dev-hub
+cd devWithMe
 
 # Install dependencies
 bun install
