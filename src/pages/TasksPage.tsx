@@ -707,7 +707,6 @@ const TasksPage = () => {
           />
         </PageContainer>
       </main>
-        
     </div>
   );
 };

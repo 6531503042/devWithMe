@@ -77,13 +77,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         
         // Setup auth change subscription
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (event, currentSession) => {
+          async (event, currentSession) => {
             if (!mounted) return;
             
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              setSession(currentSession);
-              setUser(currentSession?.user ?? null);
+            console.log(`Auth event: ${event}`);
+            
+            // Accept any valid session regardless of email verification
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
               if (currentSession) {
+                setSession(currentSession);
+                setUser(currentSession.user ?? null);
+                
                 // Store with version to allow future format changes
                 localStorage.setItem(
                   AUTH_STORAGE_KEY, 
@@ -92,9 +96,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                     data: currentSession
                   })
                 );
+                
+                setLoading(false);
+                setIsInitialized(true);
               }
-              setLoading(false);
-              setIsInitialized(true);
             } else if (event === 'SIGNED_OUT') {
               setSession(null);
               setUser(null);
@@ -102,6 +107,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               // Only redirect to auth if we're not already there
               if (location.pathname !== '/auth') {
                 navigate('/auth', { replace: true });
+              }
+              setLoading(false);
+              setIsInitialized(true);
+            } else if (event === 'INITIAL_SESSION') {
+              // For cases when the provider first loads
+              if (currentSession) {
+                setSession(currentSession);
+                setUser(currentSession.user);
+                localStorage.setItem(
+                  AUTH_STORAGE_KEY, 
+                  JSON.stringify({
+                    version: AUTH_STATE_VERSION,
+                    data: currentSession
+                  })
+                );
               }
               setLoading(false);
               setIsInitialized(true);

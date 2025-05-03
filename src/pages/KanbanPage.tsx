@@ -221,8 +221,6 @@ const KanbanPage = () => {
           </Dialog>
         </PageContainer>
       </main>
-      
-      <AppFooter />
     </div>
   );
 };

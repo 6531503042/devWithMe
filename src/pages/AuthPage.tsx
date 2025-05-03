@@ -30,6 +30,17 @@ const AuthPage = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: "Please provide both email and password.",
+      });
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -39,10 +50,16 @@ const AuthPage = () => {
       });
       
       if (error) {
+        // Provide more user-friendly error messages
+        let errorMessage = error.message;
+        if (error.message?.includes('Invalid login credentials')) {
+          errorMessage = "Invalid email or password. Please try again.";
+        }
+        
         toast({
           variant: "destructive",
           title: "Login failed",
-          description: error.message,
+          description: errorMessage,
         });
         return;
       }
@@ -53,13 +70,20 @@ const AuthPage = () => {
           description: "Welcome back!",
         });
         navigate('/tasks');
+      } else {
+        // This should rarely happen
+        toast({
+          variant: "destructive",
+          title: "Login issue",
+          description: "Successfully authenticated but no session was created. Please try again.",
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "An unexpected error occurred.",
+        description: error?.message || "An unexpected error occurred.",
       });
     } finally {
       setLoading(false);
@@ -68,21 +92,67 @@ const AuthPage = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: "Please provide both email and password.",
+      });
+      return;
+    }
+    
+    // Password validation
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: "Password must be at least 6 characters long.",
+      });
+      return;
+    }
+    
     setLoading(true);
     
     try {
+      // First, try the standard signup approach
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: window.location.origin + '/auth',
-          data: {
-            email: email,
-          }
-        }
       });
       
       if (error) {
+        // Check if it's an "Email already registered" error
+        if (error.message?.includes('already registered')) {
+          // If the user already exists, try to sign them in directly
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          if (signInError) {
+            toast({
+              variant: "destructive",
+              title: "Login failed",
+              description: signInError.message || "This email is already registered. Please log in instead.",
+            });
+            setTab('login');
+            return;
+          }
+          
+          // Successfully signed in
+          if (signInData?.session) {
+            toast({
+              title: "Login successful",
+              description: "Welcome back!",
+            });
+            navigate('/tasks');
+            return;
+          }
+        }
+        
+        // Other errors
         toast({
           variant: "destructive",
           title: "Signup failed",
@@ -91,25 +161,43 @@ const AuthPage = () => {
         return;
       }
       
+      // Successful signup
       if (data.session) {
         toast({
           title: "Signup successful",
           description: "You're now logged in!",
         });
         navigate('/tasks');
-      } else {
-        toast({
-          title: "Signup successful",
-          description: "Please check your email to verify your account.",
+      } 
+      // If signup worked but no session was created, try to sign in manually
+      else if (data.user) {
+        // Attempt to sign in with the credentials
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         });
-        setTab('login');
+        
+        if (signInError) {
+          toast({
+            variant: "destructive",
+            title: "Account created",
+            description: "Your account was created but we couldn't log you in automatically. Please sign in manually.",
+          });
+          setTab('login');
+        } else if (signInData?.session) {
+          toast({
+            title: "Signup successful",
+            description: "You're now logged in!",
+          });
+          navigate('/tasks');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup error:', error);
       toast({
         variant: "destructive",
         title: "Signup failed",
-        description: "An unexpected error occurred.",
+        description: error?.message || "An unexpected error occurred.",
       });
     } finally {
       setLoading(false);

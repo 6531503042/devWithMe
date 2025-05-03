@@ -1454,7 +1454,6 @@ const FinancePage = () => {
           </Suspense>
         </PageContainer>
       </main>
-      <AppFooter />
     </div>
   );
 };
