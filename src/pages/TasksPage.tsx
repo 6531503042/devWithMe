@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AppNavbar from '@/components/layout/AppNavbar';
 import AppFooter from '@/components/layout/AppFooter';
@@ -10,6 +11,7 @@ import TaskCard from '@/components/tasks/TaskCard';
 import TaskForm from '@/components/tasks/TaskForm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/auth/AuthProvider';
 import type { Database } from '@/integrations/supabase/types';
 
 // Define the TaskType using the Enum from Supabase
@@ -51,43 +53,13 @@ const TasksPage = () => {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | TaskType>('all');
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const { user } = useAuth();
   
-  // Check for authenticated user
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setCurrentUser(session.user.id);
-      } else {
-        // Redirect to login if not authenticated
-        window.location.href = '/login';
-      }
-    };
-    
-    checkUser();
-    
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setCurrentUser(session?.user?.id || null);
-        if (!session?.user) {
-          // Redirect to login if logged out
-          window.location.href = '/login';
-        }
-      }
-    );
-    
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-  
-  // Fetch tasks from Supabase
+  // Fetch tasks from Supabase for the current authenticated user
   const { data: tasks = [], isLoading, error } = useQuery({
-    queryKey: ['tasks', currentUser],
+    queryKey: ['tasks', user?.id],
     queryFn: async () => {
-      if (!currentUser) return [];
+      if (!user) return [];
       
       const { data, error } = await supabase
         .from('tasks')
@@ -112,6 +84,7 @@ const TasksPage = () => {
             done
           )
         `)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -169,12 +142,14 @@ const TasksPage = () => {
         return task;
       });
     },
-    enabled: !!currentUser, // Only run the query when we have a user
+    enabled: !!user, // Only run the query when we have a user
   });
   
   // Update task completion status
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, completed }: { id: string, completed: boolean }) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const { error } = await supabase
         .from('tasks')
         .update({ 
@@ -182,13 +157,14 @@ const TasksPage = () => {
           streak: completed ? tasks.find(t => t.id === id)?.streak ? (tasks.find(t => t.id === id)?.streak || 0) + 1 : 1 : Math.max((tasks.find(t => t.id === id)?.streak || 0) - 1, 0),
           best_streak: completed ? Math.max(tasks.find(t => t.id === id)?.bestStreak || 0, (tasks.find(t => t.id === id)?.streak || 0) + 1) : tasks.find(t => t.id === id)?.bestStreak
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       
       if (error) throw error;
       return { id, completed };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUser] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
     onError: (error) => {
       toast({
@@ -202,7 +178,7 @@ const TasksPage = () => {
   // Add new task
   const addTaskMutation = useMutation({
     mutationFn: async (newTask: Omit<Task, 'id'>) => {
-      if (!currentUser) {
+      if (!user) {
         throw new Error("User not authenticated");
       }
       
@@ -222,7 +198,7 @@ const TasksPage = () => {
         timer_goal_elapsed: newTask.timerGoal?.elapsed,
         streak: newTask.streak || 0,
         best_streak: newTask.bestStreak || 0,
-        user_id: currentUser // Add the user_id field here
+        user_id: user.id // Add the user_id field here
       };
       
       const { data, error } = await supabase
@@ -252,7 +228,7 @@ const TasksPage = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUser] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
       setIsFormOpen(false);
       toast({
         title: "Task created",
@@ -271,6 +247,8 @@ const TasksPage = () => {
   // Update numeric goal
   const updateNumericGoalMutation = useMutation({
     mutationFn: async ({ id, value }: { id: string, value: number }) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const task = tasks.find(t => t.id === id);
       const completed = task?.numericGoal ? value >= task.numericGoal.target : false;
       
@@ -280,13 +258,14 @@ const TasksPage = () => {
           numeric_goal_current: value,
           completed: completed
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       
       if (error) throw error;
       return { id, value, completed };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUser] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
     onError: (error) => {
       toast({
@@ -300,6 +279,8 @@ const TasksPage = () => {
   // Update timer goal
   const updateTimerGoalMutation = useMutation({
     mutationFn: async ({ id, elapsed }: { id: string, elapsed: number }) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const task = tasks.find(t => t.id === id);
       const completed = task?.timerGoal ? elapsed >= task.timerGoal.duration : false;
       
@@ -309,13 +290,14 @@ const TasksPage = () => {
           timer_goal_elapsed: elapsed,
           completed: completed
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       
       if (error) throw error;
       return { id, elapsed, completed };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUser] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
     onError: (error) => {
       toast({
@@ -329,6 +311,8 @@ const TasksPage = () => {
   // Update checklist item
   const updateChecklistItemMutation = useMutation({
     mutationFn: async ({ id, itemId, done }: { id: string, itemId: string, done: boolean }) => {
+      if (!user) throw new Error("User not authenticated");
+      
       // Update the checklist item
       const { error: itemError } = await supabase
         .from('task_checklist_items')
@@ -349,7 +333,8 @@ const TasksPage = () => {
         const { error: taskError } = await supabase
           .from('tasks')
           .update({ completed: allCompleted })
-          .eq('id', id);
+          .eq('id', id)
+          .eq('user_id', user.id);
         
         if (taskError) throw taskError;
       }
@@ -357,7 +342,7 @@ const TasksPage = () => {
       return { id, itemId, done };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUser] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
     onError: (error) => {
       toast({

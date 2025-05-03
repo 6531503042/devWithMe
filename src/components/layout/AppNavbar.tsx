@@ -2,10 +2,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Timer, ListTodo, BarChartBig, Kanban, DollarSign } from 'lucide-react';
+import { Menu, X, Timer, ListTodo, BarChartBig, Kanban, DollarSign, LogOut, User } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const AppNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -19,6 +21,10 @@ const AppNavbar = () => {
     { path: '/finance', label: 'Finance', icon: <DollarSign size={20} /> },
     { path: '/kanban', label: 'Kanban', icon: <Kanban size={20} /> },
   ];
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <nav className="bg-white dark:bg-gray-900 shadow-sm border-b">
@@ -49,6 +55,24 @@ const AppNavbar = () => {
               {link.label}
             </Link>
           ))}
+          
+          {user && (
+            <div className="flex items-center gap-4 ml-4 border-l pl-4">
+              <div className="flex items-center gap-2">
+                <User size={16} />
+                <span className="text-sm font-medium truncate max-w-[120px]">{user.email}</span>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleLogout} 
+                className="flex items-center gap-1"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -67,6 +91,21 @@ const AppNavbar = () => {
                 {link.label}
               </Link>
             ))}
+            
+            {user && (
+              <div className="border-t mt-2 pt-2">
+                <div className="px-3 py-2 text-sm text-gray-500">
+                  Signed in as: {user.email}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
