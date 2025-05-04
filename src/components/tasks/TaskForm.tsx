@@ -95,7 +95,7 @@ const categoriesWithIcons: CategoryWithIcon[] = [
 
 // Define tracking types with icons
 interface TrackingTypeWithIcon {
-  value: 'none' | 'numeric' | 'timer' | 'checklist';
+  value: 'none' | 'boolean' | 'numeric' | 'timer' | 'checklist';
   label: string;
   icon: React.ReactNode;
   description: string;
@@ -104,6 +104,13 @@ interface TrackingTypeWithIcon {
 
 // Tracking method options with descriptive data
 const trackingTypesWithIcons: TrackingTypeWithIcon[] = [
+  {
+    value: 'boolean',
+    label: 'Yes/No',
+    icon: <CheckSquare className="h-5 w-5" />,
+    description: 'Track with a boolean value',
+    color: 'text-green-500'
+  },
   {
     value: 'none',
     label: 'No Tracking',
@@ -142,6 +149,7 @@ interface Task {
   category: string | null;
   due_date?: string | null;
   completed: boolean;
+  boolean_value?: boolean | null;
   numeric_goal_current?: number | null;
   numeric_goal_target?: number | null;
   numeric_goal_unit?: string | null;
@@ -175,8 +183,9 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
   const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState('');
   
-  // Advanced tracking options
-  const [trackingType, setTrackingType] = useState<'none' | 'numeric' | 'timer' | 'checklist'>('none');
+  // Advanced tracking options - Set boolean as default
+  const [trackingType, setTrackingType] = useState<'none' | 'boolean' | 'numeric' | 'timer' | 'checklist'>('boolean');
+  const [booleanValue, setBooleanValue] = useState<boolean>(false);
   
   // Numeric goal options
   const [numericTarget, setNumericTarget] = useState('1');
@@ -234,7 +243,10 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
         }
         
         // Set tracking type and related values
-        if (existingTask.numeric_goal_target !== null) {
+        if (existingTask.boolean_value !== undefined && existingTask.boolean_value !== null) {
+          setTrackingType('boolean');
+          setBooleanValue(existingTask.boolean_value);
+        } else if (existingTask.numeric_goal_target !== null) {
           setTrackingType('numeric');
           setNumericTarget(existingTask.numeric_goal_target.toString());
           setNumericUnit(existingTask.numeric_goal_unit || '');
@@ -299,7 +311,11 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
     };
     
     // Add tracking features based on the selected type
-    if (trackingType === 'numeric') {
+    if (trackingType === 'boolean') {
+      Object.assign(task, {
+        boolean_value: booleanValue
+      });
+    } else if (trackingType === 'numeric') {
       Object.assign(task, {
         numeric_goal_current: isEditing && existingTask?.numeric_goal_current !== null 
           ? existingTask.numeric_goal_current 
@@ -393,7 +409,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
     setReminders([]);
     setIsAddingReminder(false);
     setReminderTime('');
-    setTrackingType('none');
+    setTrackingType('boolean');
     setNumericTarget('1');
     setNumericUnit('');
     setTimerDuration('15');
@@ -977,6 +993,35 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                   </p>
                 )}
               </div>
+              
+              {/* Below the trackingTypesWithIcons.map and before the specific tracking options */}
+              
+              {trackingType === 'boolean' && (
+                <div className="p-5 rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-900/30 mt-4 shadow-sm">
+                  <h4 className="text-base font-medium mb-4 flex items-center gap-2 pb-3 border-b border-green-200/50 dark:border-green-900/30">
+                    <CheckSquare className="h-5 w-5 text-green-500" />
+                    <span className="text-green-700 dark:text-green-300">Yes/No Settings</span>
+                  </h4>
+                  
+                  <div className="space-y-5">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="booleanValue" 
+                          checked={booleanValue}
+                          onCheckedChange={(checked) => setBooleanValue(checked === true)}
+                        />
+                        <Label htmlFor="booleanValue" className="text-sm mb-2 font-medium">Current Value</Label>
+                      </div>
+                      
+                      <div className="bg-green-100/80 dark:bg-green-900/30 p-3 rounded-md flex items-start gap-2 text-sm text-green-800 dark:text-green-200 mt-4">
+                        <CheckSquare className="h-4 w-4 mt-0.5 text-green-600 dark:text-green-400" />
+                        <div>Simple Yes/No tracking for tasks with binary completion states. Mark as <span className="font-semibold">{booleanValue ? 'Yes' : 'No'}</span> to indicate the current state.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Show specific tracking options based on selection */}
               {trackingType === 'numeric' && (

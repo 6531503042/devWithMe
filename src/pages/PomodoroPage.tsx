@@ -444,7 +444,7 @@ const PomodoroPage = () => {
     <div className="flex flex-col min-h-screen">
       <AppNavbar />
       
-      <main className="flex-1 py-8 md:py-12 mt-12 flex items-center justify-center pomodoro-main-container">
+      <main className="flex-1 py-8 flex items-center justify-center pomodoro-main-container">
         <PomodoroTimer />
       </main>
       

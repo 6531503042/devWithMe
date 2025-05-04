@@ -18,8 +18,6 @@ import { Label } from '@/components/ui/label';
 import type { Database } from '@/integrations/supabase/types';
 import { Slider } from '@/components/ui/slider';
 import { Timer } from 'lucide-react';
-import { SpotifyAuthProvider } from '@/integrations/spotify/SpotifyAuth';
-import SpotifyPlaylistSelector from './SpotifyPlaylistSelector';
 
 type PomodoroSession = Database['public']['Tables']['pomodoro_sessions']['Row'];
 type Task = Database['public']['Tables']['tasks']['Row'];
@@ -1150,8 +1148,8 @@ const PomodoroTimer = () => {
       // Extract video ID from URL
       if (url.includes('youtube.com/watch')) {
         try {
-        const urlParams = new URLSearchParams(new URL(url).search);
-        videoId = urlParams.get('v') || '';
+          const urlParams = new URLSearchParams(new URL(url).search);
+          videoId = urlParams.get('v') || '';
         } catch (e) {
           // Fallback for invalid URLs
           const match = url.match(/[?&]v=([^&]+)/);
@@ -1533,64 +1531,179 @@ const PomodoroTimer = () => {
     };
   }, []);
 
-  // Wrap the component with the SpotifyAuthProvider
   return (
-    <SpotifyAuthProvider>
     <Card className="bg-transparent backdrop-blur-md border-none shadow-none max-w-3xl mx-auto">
       <CardContent className="p-6 relative z-10">
         <div className="flex flex-col items-center">
           <div className="flex items-center justify-between w-full mb-4">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                className={`relative z-20 backdrop-blur-md border border-gray-500/30 ${getSettingsIconClass()}`}
-                  aria-label="Open Settings"
-                  title="Settings"
-                onClick={() => setIsSettingsOpen(true)}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              
-              <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-                <DialogContent 
-                  className="settings-panel bg-black/80 text-white fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-hidden w-[450px] max-w-[95vw] border border-white/10 rounded-xl flex flex-col"
-                >
-                  <DialogHeader className="sticky top-0 bg-black/90 backdrop-blur-md z-30 pb-2 pt-4 px-6 border-b border-white/10">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className={`relative z-20 backdrop-blur-md border border-gray-500/30 ${getSettingsIconClass()}`}
+              aria-label="Open Settings"
+              title="Settings"
+              onClick={() => setIsSettingsOpen(true)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+            
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogContent 
+                className="settings-panel bg-black/80 text-white fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-hidden w-[450px] max-w-[95vw] border border-white/10 rounded-xl flex flex-col"
+              >
+                <DialogHeader className="sticky top-0 bg-black/90 backdrop-blur-md z-30 pb-2 pt-4 px-6 border-b border-white/10">
                   <div className="flex justify-between items-center">
-                      <DialogTitle className="font-medium text-lg text-white">Timer Settings</DialogTitle>
+                    <DialogTitle className="font-medium text-lg text-white">Timer Settings</DialogTitle>
                     <Button 
                       variant="ghost" 
-                        size="icon" 
-                      onClick={() => setIsSettingsOpen(false)}
-                        className="absolute right-4 top-3 z-50 text-white hover:bg-white/20 rounded-full h-8 w-8 p-0"
+                      size="icon" 
+                      onClick={() => setIsSettingsOpen(false)} 
+                      className="absolute right-4 top-3 z-50 text-white hover:bg-white/20 rounded-full h-8 w-8 p-0"
                     >
-                        <X className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  </DialogHeader>
+                </DialogHeader>
                   
-                  <div className="settings-content space-y-4 mt-2 px-6 py-4 overflow-y-auto max-h-[calc(85vh-80px)] custom-scrollbar flex-1"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    {/* Settings dialog content */}
+                <div className="settings-content space-y-4 mt-2 px-6 py-4 overflow-y-auto max-h-[calc(85vh-80px)] custom-scrollbar flex-1"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
+                      <Palette className="h-4 w-4" /> Theme
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 theme-grid">
+                      {timerThemes.map((theme) => (
+                        <div
+                          key={theme.id}
+                          className={`rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-105 ${
+                            selectedTheme === theme.id 
+                              ? 'ring-2 ring-primary scale-105 shadow-md timer-theme-active' 
+                              : 'ring-1 ring-white/20'
+                          }`}
+                          onClick={() => changeTheme(theme.id)}
+                        >
+                          <div 
+                            className="h-16 sm:h-20 w-full relative bg-cover bg-center"
+                            style={{
+                              backgroundColor: theme.preview.startsWith('#') ? theme.preview : undefined,
+                              backgroundImage: !theme.preview.startsWith('#') ? `url(${theme.preview})` : undefined
+                            }}
+                          >
+                            {selectedTheme === theme.id && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Check className="h-6 w-6 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-1 text-xs font-medium text-center">{theme.name}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
-                  {/* Add global styles for dialog inputs */}
-                  <style dangerouslySetInnerHTML={{
-                    __html: `
-                      .settings-panel input {
-                        color: white !important;
-                      }
-                      .settings-panel input::placeholder {
-                        color: rgba(156, 163, 175, 0.8) !important;
-                      }
-                    `
-                  }} />
-                </DialogContent>
-              </Dialog>
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
+                      <Timer className="h-4 w-4" /> Timer Durations
+                    </h4>
+                    <div className="space-y-3 mt-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="pomodoro-duration" className="text-xs">Pomodoro</Label>
+                        <div className="flex items-center">
+                          <Input
+                            id="pomodoro-duration"
+                            type="number"
+                            value={pomodoroTime}
+                            onChange={(e) => setPomodoroTime(parseInt(e.target.value))}
+                            className="w-16 h-8 text-center bg-black/20 border-none"
+                            min={1}
+                            max={120}
+                          />
+                          <span className="ml-2 text-xs">min</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="short-break-duration" className="text-xs">Short Break</Label>
+                        <div className="flex items-center">
+                          <Input
+                            id="short-break-duration"
+                            type="number"
+                            value={shortBreakTime}
+                            onChange={(e) => setShortBreakTime(parseInt(e.target.value))}
+                            className="w-16 h-8 text-center bg-black/20 border-none"
+                            min={1}
+                            max={30}
+                          />
+                          <span className="ml-2 text-xs">min</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="long-break-duration" className="text-xs">Long Break</Label>
+                        <div className="flex items-center">
+                          <Input
+                            id="long-break-duration"
+                            type="number"
+                            value={longBreakTime}
+                            onChange={(e) => setLongBreakTime(parseInt(e.target.value))}
+                            className="w-16 h-8 text-center bg-black/20 border-none"
+                            min={1}
+                            max={60}
+                          />
+                          <span className="ml-2 text-xs">min</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
+                      <Volume2 className="h-4 w-4" /> Audio Settings
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="alarm-volume" className="text-xs">Timer Alarm Volume</Label>
+                        <Slider
+                          id="alarm-volume"
+                          value={[0.7 * 100]}
+                          onValueChange={(value) => {
+                            if (alarmAudioRef.current) {
+                              alarmAudioRef.current.volume = value[0] / 100;
+                            }
+                          }}
+                          max={100}
+                          step={1}
+                          className="w-32"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    className="w-full timer-start-btn mt-4" 
+                    onClick={() => setIsSettingsOpen(false)}
+                  >
+                    Save & Close
+                  </Button>
+                </div>
+
+                {/* Add global styles for dialog inputs */}
+                <style dangerouslySetInnerHTML={{
+                  __html: `
+                    .settings-panel input {
+                      color: white !important;
+                    }
+                    .settings-panel input::placeholder {
+                      color: rgba(156, 163, 175, 0.8) !important;
+                    }
+                  `
+                }} />
+              </DialogContent>
+            </Dialog>
             
             <div className="text-center flex-1">
-                <h2 className={`text-lg font-medium ${getFontColorClass()}`}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</h2>
-                <p className={`text-sm ${getFontColorClass()} opacity-75`}>
+              <h2 className={`text-lg font-medium ${getFontColorClass()}`}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</h2>
+              <p className={`text-sm ${getFontColorClass()} opacity-75`}>
                 Session {pomodorosCompleted + 1} of {sessions.length}
               </p>
             </div>
@@ -1598,11 +1711,11 @@ const PomodoroTimer = () => {
             <Button 
               variant="outline" 
               size="icon" 
-                className={`toggle-player-button backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20 ${showMediaPlayer ? 'active' : ''}`}
+              className={`toggle-player-button backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20 ${showMediaPlayer ? 'active' : ''}`}
               onClick={() => setShowMediaPlayer(!showMediaPlayer)}
-                title={showMediaPlayer ? "Hide Media Player" : "Show Media Player"}
+              title={showMediaPlayer ? "Hide Media Player" : "Show Media Player"}
             >
-                <Music className="h-4 w-4" />
+              <Music className="h-4 w-4" />
             </Button>
           </div>
 
@@ -1612,14 +1725,14 @@ const PomodoroTimer = () => {
             className="mb-6 w-full max-w-xs timer-tabs"
           >
             <TabsList className="grid grid-cols-3 w-full">
-                <TabsTrigger value="pomodoro" className={getTabTextColorClass()}>Pomodoro</TabsTrigger>
-                <TabsTrigger value="shortBreak" className={getTabTextColorClass()}>Short Break</TabsTrigger>
-                <TabsTrigger value="longBreak" className={getTabTextColorClass()}>Long Break</TabsTrigger>
+              <TabsTrigger value="pomodoro" className={getTabTextColorClass()}>Pomodoro</TabsTrigger>
+              <TabsTrigger value="shortBreak" className={getTabTextColorClass()}>Short Break</TabsTrigger>
+              <TabsTrigger value="longBreak" className={getTabTextColorClass()}>Long Break</TabsTrigger>
             </TabsList>
           </Tabs>
           
           <div className="w-full flex justify-center mb-6">
-              <div className={`timer-display text-6xl md:text-8xl font-bold p-6 md:p-8 rounded-2xl text-center w-64 md:w-80 backdrop-blur-lg ${getFontColorClass()} ${getTimerDisplayShadowClass()}`}>
+            <div className={`timer-display text-6xl md:text-8xl font-bold p-6 md:p-8 rounded-2xl text-center w-64 md:w-80 backdrop-blur-lg ${getFontColorClass()} ${getTimerDisplayShadowClass()}`}>
               {formatTime(timeRemaining)}
             </div>
           </div>
@@ -1629,7 +1742,7 @@ const PomodoroTimer = () => {
               <Button
                 variant="outline"
                 size="lg"
-                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+                className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
                 onClick={pauseTimer}
               >
                 <Pause className="h-5 w-5 mr-2" />
@@ -1639,7 +1752,7 @@ const PomodoroTimer = () => {
               <Button
                 variant="outline"
                 size="lg"
-                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+                className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
                 onClick={startTimer}
               >
                 <Play className="h-5 w-5 mr-2" />
@@ -1649,147 +1762,134 @@ const PomodoroTimer = () => {
             <Button
               variant="outline"
               size="lg"
-                className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+              className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
               onClick={resetTimer}
             >
               <RefreshCw className="h-5 w-5 mr-2" />
               Reset
             </Button>
           </div>
-          </div>
-        </CardContent>
+          
+        </div>
+      </CardContent>
 
-        {/* Music Player Section - Updated with Spotify Integration */}
-        <div className={`mt-3 px-6 pb-6 transition-all duration-300 ${!showMediaPlayer ? 'hidden' : ''}`}>
-          <div className="music-player-section rounded-xl backdrop-blur-md p-5 border border-gray-400/20 shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className={`text-lg font-medium ${getFontColorClass()}`}>Music Player</h3>
+      {/* Music Player Section - Improved UI */}
+      <div className={`mt-3 px-6 pb-6 transition-all duration-300 ${!showMediaPlayer ? 'hidden' : ''}`}>
+        <div className="music-player-section rounded-xl backdrop-blur-md p-5 border border-gray-400/20 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className={`text-lg font-medium ${getFontColorClass()}`}>Music Player</h3>
+          </div>
+          
+          <Tabs 
+            value={mediaType} 
+            onValueChange={(value) => setMediaType(value as 'spotify' | 'youtube')}
+            className="w-full"
+          >
+            <div className="flex justify-end mb-2">
+              <TabsList className="h-8">
+                <TabsTrigger value="spotify" className="text-xs px-3 h-8">
+                  <span className="flex items-center gap-1">
+                    <Music className="h-3 w-3" />
+                    <span>Spotify</span>
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="youtube" className="text-xs px-3 h-8">
+                  <span className="flex items-center gap-1">
+                    <Youtube className="h-3 w-3" />
+                    <span>YouTube</span>
+                  </span>
+                </TabsTrigger>
+              </TabsList>
             </div>
             
-            <Tabs 
-              value={mediaType} 
-              onValueChange={(value) => setMediaType(value as 'spotify' | 'youtube')}
-              className="w-full"
-            >
-              <div className="flex justify-end mb-2">
-                <TabsList className="h-8">
-                  <TabsTrigger value="spotify" className="text-xs px-3 h-8">
-                    <span className="flex items-center gap-1">
-                      <Music className="h-3 w-3" />
-                      <span>Spotify</span>
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger value="youtube" className="text-xs px-3 h-8">
-                    <span className="flex items-center gap-1">
-                      <Youtube className="h-3 w-3" />
-                      <span>YouTube</span>
-                    </span>
-                  </TabsTrigger>
-                </TabsList>
-        </div>
-              
-              <TabsContent value="spotify" className="p-0 m-0">
-                <div className="spotify-container mb-4 bg-black/5 rounded-lg p-1">
-                  <iframe 
-                    ref={spotifyEmbedRef}
-                    src={getSpotifyEmbedUrl(spotifyUrl)}
-                    width="100%" 
-                    height="152" 
-                    frameBorder="0" 
-                    allow="encrypted-media"
-                    className="rounded-lg shadow-md"
-                  ></iframe>
-                </div>
-                <div className="flex justify-end mb-2">
-                  <SpotifyPlaylistSelector 
-                    onSelectPlaylist={(url) => {
-                      setSpotifyUrl(url);
-                      if (spotifyEmbedRef.current) {
-                        spotifyEmbedRef.current.src = url;
-                      }
-                      saveMediaUrls();
-                    }}
-                    currentUrl={spotifyUrl}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="youtube" className="p-0 m-0">
-                <div className="youtube-container mb-4 bg-black/5 rounded-lg p-1">
-                  <iframe 
-                    ref={youtubeEmbedRef}
-                    width="100%" 
-                    height="240" 
-                    src={getYoutubeEmbedUrl(youtubeUrl)}
-                    frameBorder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowFullScreen
-                    className="rounded-lg shadow-md"
-                  ></iframe>
-                </div>
-                <div className="mt-3 mb-1">
-                  <Input
-                    placeholder="Paste YouTube URL to change the player"
-                    value={youtubeUrl}
-                    onChange={(e) => {
-                      setYoutubeUrl(e.target.value);
-                      if (youtubeEmbedRef.current && e.target.value) {
-                        youtubeEmbedRef.current.src = getYoutubeEmbedUrl(e.target.value);
-                        saveMediaUrls();
-                      }
-                    }}
-                    className={`h-8 text-sm ${getInputStyleClass()}`}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            {/* Quick Playlists */}
-            <div className="mt-4">
-              <Label className={`text-sm font-medium block mb-2 ${getFontColorClass()}`}>Recommended Playlists</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {popularPlaylists.slice(0, 8).map((playlist, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className={`playlist-button h-10 text-xs flex items-center justify-center ${
-                      isDarkTheme(selectedTheme) 
-                        ? 'bg-black/20 hover:bg-white/10 text-white border-white/20' 
-                        : 'bg-white/20 hover:bg-black/10 text-black border-black/20'
-                    }`}
-                    onClick={() => {
-                      if (mediaType === 'spotify') {
-                        setSpotifyUrl(playlist.spotify);
-                        if (spotifyEmbedRef.current) {
-                          spotifyEmbedRef.current.src = getSpotifyEmbedUrl(playlist.spotify);
-                        }
-                      } else {
-                        setYoutubeUrl(playlist.youtube);
-                        if (youtubeEmbedRef.current) {
-                          youtubeEmbedRef.current.src = getYoutubeEmbedUrl(playlist.youtube);
-                        }
-                      }
-                      setUseRecommendedPlaylist(false);
-                      saveMediaUrls();
-                    }}
-                  >
-                    <span className="truncate">{playlist.name}</span>
-                  </Button>
-                ))}
+            <TabsContent value="spotify" className="p-0 m-0">
+              <div className="spotify-container mb-4 bg-black/5 rounded-lg p-1">
+                <iframe 
+                  ref={spotifyEmbedRef}
+                  src={getSpotifyEmbedUrl(spotifyUrl)}
+                  width="100%" 
+                  height="152" 
+                  frameBorder="0" 
+                  allow="encrypted-media"
+                  className="rounded-lg shadow-md"
+                ></iframe>
               </div>
-            </div>
+            </TabsContent>
             
-            {/* Attribution */}
-            <div className="text-right mt-4">
-              <p className="text-xs text-gray-400">Inspired by devwithme</p>
+            <TabsContent value="youtube" className="p-0 m-0">
+              <div className="youtube-container mb-4 bg-black/5 rounded-lg p-1">
+                <iframe 
+                  ref={youtubeEmbedRef}
+                  width="100%" 
+                  height="240" 
+                  src={getYoutubeEmbedUrl(youtubeUrl)}
+                  frameBorder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen
+                  className="rounded-lg shadow-md"
+                ></iframe>
+              </div>
+              <div className="mt-3 mb-1">
+                <Input
+                  placeholder="Paste YouTube URL to change the player"
+                  value={youtubeUrl}
+                  onChange={(e) => {
+                    setYoutubeUrl(e.target.value);
+                    if (youtubeEmbedRef.current && e.target.value) {
+                      youtubeEmbedRef.current.src = getYoutubeEmbedUrl(e.target.value);
+                      saveMediaUrls();
+                    }
+                  }}
+                  className={`h-8 text-sm ${getInputStyleClass()}`}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          {/* Quick Playlists */}
+          <div className="mt-4">
+            <Label className={`text-sm font-medium block mb-2 ${getFontColorClass()}`}>Recommended Playlists</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {popularPlaylists.slice(0, 8).map((playlist, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  className={`playlist-button h-10 text-xs flex items-center justify-center ${
+                    isDarkTheme(selectedTheme) 
+                      ? 'bg-black/20 hover:bg-white/10 text-white border-white/20' 
+                      : 'bg-white/20 hover:bg-black/10 text-black border-black/20'
+                  }`}
+                  onClick={() => {
+                    if (mediaType === 'spotify') {
+                      setSpotifyUrl(playlist.spotify);
+                      if (spotifyEmbedRef.current) {
+                        spotifyEmbedRef.current.src = getSpotifyEmbedUrl(playlist.spotify);
+                      }
+                    } else {
+                      setYoutubeUrl(playlist.youtube);
+                      if (youtubeEmbedRef.current) {
+                        youtubeEmbedRef.current.src = getYoutubeEmbedUrl(playlist.youtube);
+                      }
+                    }
+                    setUseRecommendedPlaylist(false);
+                    saveMediaUrls();
+                  }}
+                >
+                  <span className="truncate">{playlist.name}</span>
+                </Button>
+              ))}
             </div>
           </div>
+          
+          {/* Attribution */}
+          <div className="text-right mt-4">
+            <p className="text-xs text-gray-400">Inspired by devwithme</p>
+          </div>
         </div>
+      </div>
     </Card>
-    </SpotifyAuthProvider>
   );
 };
 
 export default PomodoroTimer;
-
