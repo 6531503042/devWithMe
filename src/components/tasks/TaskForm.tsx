@@ -189,7 +189,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
   const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; done: boolean }[]>([
     { id: '1', text: '', done: false }
   ]);
-
+  
   // Editing mode state
   const [isEditing, setIsEditing] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -334,9 +334,9 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
 
     // Submit with a delay to show loading state
     setTimeout(() => {
-      onSubmit(task);
-      resetForm();
-      onOpenChange(false);
+    onSubmit(task);
+    resetForm();
+    onOpenChange(false);
       setIsSubmitting(false);
     }, 800);
   };
@@ -457,7 +457,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
       }
       if (!category) {
         setCategorySelected(false);
-        return;
+      return;
       }
     }
     
@@ -525,7 +525,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
     newReminders.splice(index, 1);
     setReminders(newReminders);
   };
-
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-hidden flex flex-col">
@@ -614,16 +614,16 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
               <div className="grid gap-3">
                 <Label htmlFor="title" className="text-lg font-medium">Task Name</Label>
                 <div className="relative">
-                  <Input 
-                    id="title"
-                    value={title}
+                <Input 
+                  id="title"
+                  value={title}
                     onChange={(e) => {
                       setTitle(e.target.value);
                       if (titleError) validateTitle();
                     }}
                     onBlur={validateTitle}
                     placeholder="What do you want to accomplish?"
-                    required
+                  required
                     className="h-14 text-base rounded-lg px-4 shadow-sm focus:shadow-md transition-shadow"
                     autoFocus
                   />
@@ -718,7 +718,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                     </button>
                   ))}
                 </div>
-                
+
                 {!typeSelected && (
                   <p className="text-red-500 text-sm mt-2">Please select a task type</p>
                 )}
@@ -790,7 +790,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                       </div>
                       <span className="text-sm font-medium">Create Category</span>
                     </button>
-                  </div>
+                </div>
                 )}
                 
                 {!categorySelected && (
@@ -801,7 +801,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
               {/* Due Date and Time (for task and recurring only) */}
               {type !== 'habit' && (
                 <div className="space-y-4">
-                  <div className="grid gap-2">
+                <div className="grid gap-2">
                     <Label htmlFor="dueDate" className="text-base flex justify-between">
                       <span>Due Date</span>
                       <span className="text-xs text-muted-foreground font-normal">
@@ -810,11 +810,11 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                     </Label>
                     <div className="relative">
                       <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                        id="dueDate"
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
+                  <Input 
+                    id="dueDate"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
                         className="pl-10 h-12"
                       />
                     </div>
@@ -901,7 +901,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                   </div>
                 </div>
               )}
-            </div>
+              </div>
           )}
           
           {/* Step 3: Tracking Method */}
@@ -999,13 +999,13 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <Input
-                          id="numericTarget"
-                          type="number"
-                          value={numericTarget}
-                          onChange={(e) => setNumericTarget(e.target.value)}
-                          min="1"
-                          required
+                          <Input
+                            id="numericTarget"
+                            type="number"
+                            value={numericTarget}
+                            onChange={(e) => setNumericTarget(e.target.value)}
+                            min="1"
+                            required
                           className="text-center h-10 text-lg font-medium bg-white dark:bg-gray-800"
                         />
                         <Button
@@ -1018,19 +1018,19 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
+                        </div>
                     
                     <div>
                       <Label htmlFor="numericUnit" className="text-sm mb-2 block font-medium">Unit <span className="font-normal">(optional)</span></Label>
-                      <Input
-                        id="numericUnit"
-                        value={numericUnit}
-                        onChange={(e) => setNumericUnit(e.target.value)}
-                        placeholder="e.g., glasses, pages, miles"
+                          <Input
+                            id="numericUnit"
+                            value={numericUnit}
+                            onChange={(e) => setNumericUnit(e.target.value)}
+                            placeholder="e.g., glasses, pages, miles"
                         className="bg-white dark:bg-gray-800"
-                      />
+                          />
                       <p className="text-xs text-muted-foreground mt-2">Define what you're counting (e.g., steps, pages, minutes)</p>
-                    </div>
+                      </div>
                     
                     <div className="bg-blue-100/80 dark:bg-blue-900/30 p-3 rounded-md flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
                       <Target className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400" />
@@ -1048,7 +1048,7 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                   </h4>
                   
                   <div className="space-y-5">
-                    <div>
+                      <div>
                       <Label htmlFor="timerDuration" className="text-sm mb-2 block font-medium">Duration in Minutes</Label>
                       <div className="grid grid-cols-3 gap-3">
                         <Button
@@ -1113,43 +1113,43 @@ const TaskForm = ({ open, onOpenChange, onSubmit, existingTask, onDelete }: Task
                   </h4>
                   
                   <div className="space-y-3">
-                    {checklistItems.map((item, index) => (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <Input
-                          value={item.text}
-                          onChange={(e) => updateChecklistItem(item.id, e.target.value)}
-                          placeholder={`Item ${index + 1}`}
+                        {checklistItems.map((item, index) => (
+                          <div key={item.id} className="flex items-center gap-2">
+                            <Input
+                              value={item.text}
+                              onChange={(e) => updateChecklistItem(item.id, e.target.value)}
+                              placeholder={`Item ${index + 1}`}
                           className="flex-1 bg-white dark:bg-gray-800"
-                        />
+                            />
+                            <Button
+                              type="button"
+                          variant="outline"
+                              size="icon"
+                              onClick={() => removeChecklistItem(item.id)}
+                              disabled={checklistItems.length === 1}
+                          className="h-9 w-9 p-0 flex-shrink-0 bg-white dark:bg-gray-800"
+                            >
+                          <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                    
                         <Button
                           type="button"
                           variant="outline"
-                          size="icon"
-                          onClick={() => removeChecklistItem(item.id)}
-                          disabled={checklistItems.length === 1}
-                          className="h-9 w-9 p-0 flex-shrink-0 bg-white dark:bg-gray-800"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addChecklistItem}
+                          size="sm"
+                          onClick={addChecklistItem}
                       className="w-full mt-2 border-dashed"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Item
-                    </Button>
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Item
+                        </Button>
                     
                     <div className="bg-indigo-100/80 dark:bg-indigo-900/30 p-3 rounded-md flex items-start gap-2 text-sm text-indigo-800 dark:text-indigo-200 mt-2">
                       <ListChecks className="h-4 w-4 mt-0.5 text-indigo-600 dark:text-indigo-400" />
                       <div>Break down your task into smaller, manageable steps. When all items are completed, the task will be marked as done.</div>
-                    </div>
-                  </div>
+                      </div>
+                </div>
                 </div>
               )}
             </div>

@@ -727,7 +727,7 @@ const TasksPage = () => {
               <p>No tasks found. Create a new task to get started.</p>
               <Button className="mt-4" onClick={() => setIsFormOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" /> Add Task
-              </Button>
+                </Button>
             </div>
           ) : viewOption === 'board' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
@@ -747,16 +747,16 @@ const TasksPage = () => {
           ) : (
             <div className="space-y-3 mt-6">
               {filteredTasks().map((task) => (
-                <TaskCard
+                  <TaskCard
                   key={task.id}
-                  task={task}
-                  onComplete={handleTaskComplete}
-                  onNumericUpdate={handleNumericUpdate}
-                  onTimerUpdate={handleTimerUpdate}
-                  onChecklistUpdate={handleChecklistUpdate}
+                    task={task}
+                    onComplete={handleTaskComplete}
+                    onNumericUpdate={handleNumericUpdate}
+                    onTimerUpdate={handleTimerUpdate}
+                    onChecklistUpdate={handleChecklistUpdate}
                   onDelete={handleDeleteTask}
                   onEdit={handleEditTask}
-                />
+                  />
               ))}
             </div>
           )}

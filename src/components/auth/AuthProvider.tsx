@@ -45,19 +45,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
+
   // Authentication setup - runs once on mount
   useEffect(() => {
     let mounted = true;
     
     const initAuth = async () => {
       try {
-        // Try to get session from localStorage first for faster initial render
+    // Try to get session from localStorage first for faster initial render
         const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
         let initialStateLoaded = false;
         
         if (storedData) {
-          try {
+      try {
             const { version, data } = JSON.parse(storedData);
             
             // Only use cached data if version matches
@@ -68,15 +68,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             } else {
               // Clear outdated data
               localStorage.removeItem(AUTH_STORAGE_KEY);
-            }
-          } catch (e) {
-            console.error('Failed to parse stored session:', e);
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-          }
         }
-        
+      } catch (e) {
+        console.error('Failed to parse stored session:', e);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+    }
+
         // Setup auth change subscription
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, currentSession) => {
             if (!mounted) return;
             
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             // Accept any valid session regardless of email verification
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
               if (currentSession) {
-                setSession(currentSession);
+          setSession(currentSession);
                 setUser(currentSession.user ?? null);
                 
                 // Store with version to allow future format changes
@@ -99,15 +99,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 
                 setLoading(false);
                 setIsInitialized(true);
-              }
-            } else if (event === 'SIGNED_OUT') {
-              setSession(null);
-              setUser(null);
-              localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
               // Only redirect to auth if we're not already there
               if (location.pathname !== '/auth') {
                 navigate('/auth', { replace: true });
-              }
+        }
               setLoading(false);
               setIsInitialized(true);
             } else if (event === 'INITIAL_SESSION') {
@@ -123,25 +123,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                   })
                 );
               }
-              setLoading(false);
-              setIsInitialized(true);
+        setLoading(false);
+        setIsInitialized(true);
             }
-          }
-        );
-        
+      }
+    );
+
         // If we didn't load from cache, get session from API
         if (!initialStateLoaded) {
-          const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
           
           if (!mounted) return;
-          
-          if (error) {
-            throw error;
-          }
-          
-          if (currentSession) {
-            setSession(currentSession);
-            setUser(currentSession.user);
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
             localStorage.setItem(
               AUTH_STORAGE_KEY, 
               JSON.stringify({
@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             );
           } else if (requireAuth && !DEVELOPMENT_MODE && location.pathname !== '/auth') {
             navigate('/auth', { replace: true });
-          }
+        }
         }
         
         // Set loading to false even if there's no session
@@ -165,22 +165,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
-          toast({
-            title: 'Authentication Error',
-            description: 'There was a problem with your authentication session',
-            variant: 'destructive'
-          });
-          setLoading(false);
-          setIsInitialized(true);
+        toast({
+          title: 'Authentication Error',
+          description: 'There was a problem with your authentication session',
+          variant: 'destructive'
+        });
+        setLoading(false);
+        setIsInitialized(true);
         }
         // Return empty function for cleanup when there's an error
         return () => {};
       }
     };
-    
+
     // Execute the init function and store the cleanup
     const unsubscribe = initAuth();
-    
+
     // Return cleanup function
     return () => {
       mounted = false;
@@ -189,7 +189,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       unsubscribe.then(cleanupFn => cleanupFn());
     };
   }, [navigate, requireAuth, toast, location.pathname]);
-  
+
   const signOut = async () => {
     try {
       setLoading(true);

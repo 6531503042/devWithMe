@@ -2,6 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 
+// Types for caching
+export interface KanbanBoard {
+  id: string;
+  title: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  color?: string;
+  description?: string;
+}
+
 // Simple hook for transactions with proper caching
 export function useTransactions() {
   const { user } = useAuth();
@@ -85,7 +96,7 @@ export function useKanbanBoards() {
   const { user } = useAuth();
   const userId = user?.id;
 
-  return useQuery({
+  return useQuery<KanbanBoard[]>({
     queryKey: ['kanban_boards', userId],
     queryFn: async () => {
       if (!userId) return [];

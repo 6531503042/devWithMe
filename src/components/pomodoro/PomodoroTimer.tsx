@@ -1150,8 +1150,8 @@ const PomodoroTimer = () => {
       // Extract video ID from URL
       if (url.includes('youtube.com/watch')) {
         try {
-          const urlParams = new URLSearchParams(new URL(url).search);
-          videoId = urlParams.get('v') || '';
+        const urlParams = new URLSearchParams(new URL(url).search);
+        videoId = urlParams.get('v') || '';
         } catch (e) {
           // Fallback for invalid URLs
           const match = url.match(/[?&]v=([^&]+)/);
@@ -1536,44 +1536,44 @@ const PomodoroTimer = () => {
   // Wrap the component with the SpotifyAuthProvider
   return (
     <SpotifyAuthProvider>
-      <Card className="bg-transparent backdrop-blur-md border-none shadow-none max-w-3xl mx-auto">
-        <CardContent className="p-6 relative z-10">
-          <div className="flex flex-col items-center">
-            <div className="flex items-center justify-between w-full mb-4">
-              <Button 
-                variant="outline" 
-                size="icon" 
+    <Card className="bg-transparent backdrop-blur-md border-none shadow-none max-w-3xl mx-auto">
+      <CardContent className="p-6 relative z-10">
+        <div className="flex flex-col items-center">
+          <div className="flex items-center justify-between w-full mb-4">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
                 className={`relative z-20 backdrop-blur-md border border-gray-500/30 ${getSettingsIconClass()}`}
-                aria-label="Open Settings"
-                title="Settings"
+                  aria-label="Open Settings"
+                  title="Settings"
                 onClick={() => setIsSettingsOpen(true)}
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               
               <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 <DialogContent 
                   className="settings-panel bg-black/80 text-white fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-hidden w-[450px] max-w-[95vw] border border-white/10 rounded-xl flex flex-col"
                 >
                   <DialogHeader className="sticky top-0 bg-black/90 backdrop-blur-md z-30 pb-2 pt-4 px-6 border-b border-white/10">
-                    <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center">
                       <DialogTitle className="font-medium text-lg text-white">Timer Settings</DialogTitle>
-                      <Button 
-                        variant="ghost" 
+                    <Button 
+                      variant="ghost" 
                         size="icon" 
-                        onClick={() => setIsSettingsOpen(false)} 
+                      onClick={() => setIsSettingsOpen(false)}
                         className="absolute right-4 top-3 z-50 text-white hover:bg-white/20 rounded-full h-8 w-8 p-0"
-                      >
+                    >
                         <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    </Button>
+                  </div>
                   </DialogHeader>
                   
                   <div className="settings-content space-y-4 mt-2 px-6 py-4 overflow-y-auto max-h-[calc(85vh-80px)] custom-scrollbar flex-1"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {/* Settings dialog content */}
                   </div>
-
+                  
                   {/* Add global styles for dialog inputs */}
                   <style dangerouslySetInnerHTML={{
                     __html: `
@@ -1587,75 +1587,75 @@ const PomodoroTimer = () => {
                   }} />
                 </DialogContent>
               </Dialog>
-              
-              <div className="text-center flex-1">
+            
+            <div className="text-center flex-1">
                 <h2 className={`text-lg font-medium ${getFontColorClass()}`}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</h2>
                 <p className={`text-sm ${getFontColorClass()} opacity-75`}>
-                  Session {pomodorosCompleted + 1} of {sessions.length}
-                </p>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={`toggle-player-button backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20 ${showMediaPlayer ? 'active' : ''}`}
-                onClick={() => setShowMediaPlayer(!showMediaPlayer)}
-                title={showMediaPlayer ? "Hide Media Player" : "Show Media Player"}
-              >
-                <Music className="h-4 w-4" />
-              </Button>
+                Session {pomodorosCompleted + 1} of {sessions.length}
+              </p>
             </div>
-
-            <Tabs 
-              value={mode} 
-              onValueChange={(value) => setModeOriginal(value as keyof typeof timerModes)} 
-              className="mb-6 w-full max-w-xs timer-tabs"
+            
+            <Button 
+              variant="outline" 
+              size="icon" 
+                className={`toggle-player-button backdrop-blur-md border-none ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white hover:bg-white/20' : 'bg-white/20 text-black hover:bg-black/20'} relative z-20 ${showMediaPlayer ? 'active' : ''}`}
+              onClick={() => setShowMediaPlayer(!showMediaPlayer)}
+                title={showMediaPlayer ? "Hide Media Player" : "Show Media Player"}
             >
-              <TabsList className="grid grid-cols-3 w-full">
+                <Music className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Tabs 
+            value={mode} 
+            onValueChange={(value) => setModeOriginal(value as keyof typeof timerModes)} 
+            className="mb-6 w-full max-w-xs timer-tabs"
+          >
+            <TabsList className="grid grid-cols-3 w-full">
                 <TabsTrigger value="pomodoro" className={getTabTextColorClass()}>Pomodoro</TabsTrigger>
                 <TabsTrigger value="shortBreak" className={getTabTextColorClass()}>Short Break</TabsTrigger>
                 <TabsTrigger value="longBreak" className={getTabTextColorClass()}>Long Break</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            <div className="w-full flex justify-center mb-6">
+            </TabsList>
+          </Tabs>
+          
+          <div className="w-full flex justify-center mb-6">
               <div className={`timer-display text-6xl md:text-8xl font-bold p-6 md:p-8 rounded-2xl text-center w-64 md:w-80 backdrop-blur-lg ${getFontColorClass()} ${getTimerDisplayShadowClass()}`}>
-                {formatTime(timeRemaining)}
-              </div>
+              {formatTime(timeRemaining)}
             </div>
-            
-            <div className="flex justify-center mb-8 gap-3">
-              {isActive ? (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
-                  onClick={pauseTimer}
-                >
-                  <Pause className="h-5 w-5 mr-2" />
-                  Pause
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
-                  onClick={startTimer}
-                >
-                  <Play className="h-5 w-5 mr-2" />
-                  Start
-                </Button>
-              )}
+          </div>
+          
+          <div className="flex justify-center mb-8 gap-3">
+            {isActive ? (
               <Button
                 variant="outline"
                 size="lg"
-                className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
-                onClick={resetTimer}
+                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+                onClick={pauseTimer}
               >
-                <RefreshCw className="h-5 w-5 mr-2" />
-                Reset
+                <Pause className="h-5 w-5 mr-2" />
+                Pause
               </Button>
-            </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="lg"
+                  className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+                onClick={startTimer}
+              >
+                <Play className="h-5 w-5 mr-2" />
+                Start
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="lg"
+                className={`w-32 h-14 font-medium backdrop-blur-lg ${isDarkTheme(selectedTheme) ? 'bg-black/20 text-white border-white/20' : 'bg-white/20 text-black border-black/20'}`}
+              onClick={resetTimer}
+            >
+              <RefreshCw className="h-5 w-5 mr-2" />
+              Reset
+            </Button>
+          </div>
           </div>
         </CardContent>
 
@@ -1686,7 +1686,7 @@ const PomodoroTimer = () => {
                     </span>
                   </TabsTrigger>
                 </TabsList>
-              </div>
+        </div>
               
               <TabsContent value="spotify" className="p-0 m-0">
                 <div className="spotify-container mb-4 bg-black/5 rounded-lg p-1">
@@ -1786,7 +1786,7 @@ const PomodoroTimer = () => {
             </div>
           </div>
         </div>
-      </Card>
+    </Card>
     </SpotifyAuthProvider>
   );
 };

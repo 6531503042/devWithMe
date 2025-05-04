@@ -21,7 +21,7 @@ import {
   Tag,
   X,
   AlertCircle,
-  Target,
+  Target, 
   Trash2,
   MoreVertical,
   Edit

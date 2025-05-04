@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 import { lazy, Suspense } from "react";
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
@@ -38,31 +39,33 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/spotify-callback" element={<SpotifyCallback />} />
-              
-              {/* Protected routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-              <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
-              <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
-              <Route path="/pomodoro" element={<ProtectedRoute><PomodoroPage /></ProtectedRoute>} />
-              <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
-              
-              {/* Not found */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
-      </BrowserRouter>
-      
-      <Toaster />
-      <Sonner position="top-right" />
+      <LanguageProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/spotify-callback" element={<SpotifyCallback />} />
+                
+                {/* Protected routes */}
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+                <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+                <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
+                <Route path="/pomodoro" element={<ProtectedRoute><PomodoroPage /></ProtectedRoute>} />
+                <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
+                
+                {/* Not found */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+        
+        <Toaster />
+        <Sonner position="top-right" />
+      </LanguageProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

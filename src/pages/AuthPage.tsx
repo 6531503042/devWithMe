@@ -182,8 +182,8 @@ const AuthPage = () => {
             variant: "destructive",
             title: "Account created",
             description: "Your account was created but we couldn't log you in automatically. Please sign in manually.",
-          });
-          setTab('login');
+        });
+        setTab('login');
         } else if (signInData?.session) {
           toast({
             title: "Signup successful",

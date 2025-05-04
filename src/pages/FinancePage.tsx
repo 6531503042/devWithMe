@@ -907,26 +907,26 @@ const FinanceContent = () => {
       {/* Account Selection Header */}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="account-select">Account:</Label>
-            <Select value={selectedAccountId || ''} onValueChange={setSelectedAccountId}>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="account-select">Account:</Label>
+              <Select value={selectedAccountId || ''} onValueChange={setSelectedAccountId}>
               <SelectTrigger className="min-w-[150px] w-full sm:w-auto" id="account-select">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((acc) => (
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
                   <SelectItem key={acc.id} value={acc.id}>
                     {acc.name} ({acc.currency})
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  ))}
+                </SelectContent>
+              </Select>
           </div>
           
           <div className="flex gap-2 self-start sm:self-auto mt-2 sm:mt-0">
             <Button size="sm" variant="outline" onClick={() => setIsAddAccountOpen(true)} className="flex-1 sm:flex-auto">
-              + New Account
-            </Button>
+                + New Account
+              </Button>
             
             <Button 
               onClick={() => fetchAll(true)} 
@@ -945,10 +945,10 @@ const FinanceContent = () => {
               )}
             </Button>
           </div>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {selectedAccountId && (
+              {selectedAccountId && (
         <>
           {/* Time Period Tabs */}
           <Tabs 
@@ -1075,12 +1075,12 @@ const FinanceContent = () => {
                           No {categoryDisplayType} data available
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                  </CardContent>
+                </Card>
                 </div>
                 
                 <div className="lg:col-span-2 order-1 lg:order-2">
-                  <Card>
+                <Card>
                     <CardHeader>
                       <CardTitle>Calendar View</CardTitle>
                       <CardDescription>Transactions for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
@@ -1090,30 +1090,30 @@ const FinanceContent = () => {
                         transactions={filteredTransactions} 
                         selectedMonth={selectedMonth} 
                       />
-                    </CardContent>
-                  </Card>
+                  </CardContent>
+                </Card>
                   
                   <Card className="mt-4 sm:mt-6">
-                    <CardHeader>
-                      <CardTitle>Recent Transactions</CardTitle>
+                <CardHeader>
+                  <CardTitle>Recent Transactions</CardTitle>
                       <CardDescription>Latest activity for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                </CardHeader>
+                <CardContent>
                       <div className="space-y-3 max-h-[300px] overflow-y-auto">
                         {filteredTransactions.slice(0, 8).map((transaction) => (
                           <div key={transaction.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0 group relative">
                             <div className="flex-grow pr-10">
                               <div className="font-medium capitalize flex items-center gap-1.5 text-sm">
-                                {transaction.transaction_categories?.icon && (
-                                  <span style={{ color: transaction.transaction_categories.color || undefined }}>
-                                    {transaction.transaction_categories.icon}
-                                  </span>
-                                )}
-                                {transaction.transaction_categories?.name || 'Other'}
-                              </div>
+                            {transaction.transaction_categories?.icon && (
+                              <span style={{ color: transaction.transaction_categories.color || undefined }}>
+                                {transaction.transaction_categories.icon}
+                              </span>
+                            )}
+                            {transaction.transaction_categories?.name || 'Other'}
+                          </div>
                               <div className="text-xs text-muted-foreground">
                                 {new Date(transaction.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                              </div>
+                        </div>
                               {transaction.note && (
                                 <div className="text-xs text-muted-foreground mt-1 truncate max-w-[150px] sm:max-w-none">
                                   {transaction.note}
@@ -1149,18 +1149,18 @@ const FinanceContent = () => {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </div>
-                        ))}
-                        {filteredTransactions.length === 0 && (
-                          <div className="text-center py-4 text-muted-foreground">
-                            No transactions found
-                          </div>
-                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
+                    ))}
+                        {filteredTransactions.length === 0 && (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No transactions found
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
             </TabsContent>
             
             <TabsContent value="yearly" className="mt-4">
@@ -1217,20 +1217,20 @@ const FinanceContent = () => {
                     </div>
                   </CardContent>
                 </Card>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
                       <CardTitle>Income Trend</CardTitle>
                       <CardDescription>Monthly income trend for the year</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-64">
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
                         {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="name" />
+                        <XAxis dataKey="name" />
                               <YAxis tickFormatter={(value) => 
                                 value.toLocaleString('en-US', {
                                   notation: 'compact',
@@ -1249,25 +1249,25 @@ const FinanceContent = () => {
                                 fillOpacity={0.2}
                               />
                             </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
                             No income data available
-                          </div>
-                        )}
-                      </div>
-                  </CardContent>
-                </Card>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
                   
-                  <Card>
-                    <CardHeader>
+            <Card>
+              <CardHeader>
                       <CardTitle>Expense Trend</CardTitle>
                       <CardDescription>Monthly expense trend for the year</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-64">
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
                         {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                               <XAxis dataKey="name" />
@@ -1289,16 +1289,16 @@ const FinanceContent = () => {
                                 fillOpacity={0.2}
                               />
                             </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            No expense data available
-              </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No expense data available
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
+          </div>
               </div>
             </TabsContent>
             

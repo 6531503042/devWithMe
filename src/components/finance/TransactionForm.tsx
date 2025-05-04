@@ -318,25 +318,25 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
         });
       } else {
         // Create new transaction
-        const { error } = await supabase
-          .from('transactions')
-          .insert({
-            account_id: accountId,
-            amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
-            type,
-            category_id: categoryId,
-            note: note.trim() || null,
-            date: date.toISOString(),
-            tags: tagsArray,
-            user_id: user?.id || 'dev-user'
-          });
-
-        if (error) throw error;
-        
-        toast({
-          title: 'Success',
-          description: 'Transaction added successfully'
+      const { error } = await supabase
+        .from('transactions')
+        .insert({
+          account_id: accountId,
+          amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
+          type,
+          category_id: categoryId,
+          note: note.trim() || null,
+          date: date.toISOString(),
+          tags: tagsArray,
+          user_id: user?.id || 'dev-user'
         });
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Transaction added successfully'
+      });
       }
       
       resetForm();
@@ -504,64 +504,64 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
             {currentStep === 1 && (
               <div className="space-y-4">
                 {/* Type selection */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    type="button"
-                    variant={type === 'expense' ? 'default' : 'outline'} 
-                    className={cn(
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                type="button"
+                variant={type === 'expense' ? 'default' : 'outline'} 
+                className={cn(
                       "w-full justify-center text-base font-normal h-10 sm:h-12",
-                      type === 'expense' && "bg-red-500 hover:bg-red-600 text-white"
-                    )}
+                  type === 'expense' && "bg-red-500 hover:bg-red-600 text-white"
+                )}
                     onClick={() => {
                       setType('expense');
                       // We clear categoryId since categories are type-specific
                       setCategoryId('');
                     }}
-                  >
+              >
                     <ArrowUpCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
                     <span className="whitespace-nowrap">Expense</span>
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant={type === 'income' ? 'default' : 'outline'} 
-                    className={cn(
+              </Button>
+              <Button 
+                type="button"
+                variant={type === 'income' ? 'default' : 'outline'} 
+                className={cn(
                       "w-full justify-center text-base font-normal h-10 sm:h-12",
-                      type === 'income' && "bg-green-500 hover:bg-green-600 text-white"
-                    )}
+                  type === 'income' && "bg-green-500 hover:bg-green-600 text-white"
+                )}
                     onClick={() => {
                       setType('income');
                       // We clear categoryId since categories are type-specific
                       setCategoryId('');
                     }}
-                  >
+              >
                     <ArrowDownCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
                     <span className="whitespace-nowrap">Income</span>
-                  </Button>
-                </div>
+              </Button>
+            </div>
 
-                {/* Amount */}
+            {/* Amount */}
                 <div className="grid gap-2 mt-4">
                   <Label htmlFor="amount" className="text-base font-medium">Amount</Label>
-                  <div className="relative">
+              <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="amount"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      placeholder="0.00"
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
                       className={cn(
                         "pl-10 text-lg sm:text-xl h-12 sm:h-14 font-medium", 
                         amountError ? "border-red-500 focus-visible:ring-red-500" : ""
                       )}
-                      value={amount}
+                  value={amount}
                       onChange={(e) => {
                         setAmount(e.target.value);
                         if (amountError) validateAmount();
                       }}
                       onBlur={validateAmount}
-                      required
-                    />
+                  required
+                />
                   </div>
                   {amountError && (
                     <p className="text-red-500 text-sm mt-1">{amountError}</p>
@@ -659,7 +659,7 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
                               setLoadingCategory('');
                             }
                           }}
-                        >
+                      >
                           <div className="flex items-center w-full">
                             <span className={`flex-shrink-0 mr-2 ${isSelected ? "text-white" : cat.color}`}>{cat.icon}</span>
                             <span className="font-medium truncate">{cat.name}</span>
@@ -667,7 +667,7 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
                               <span className="ml-auto bg-white/20 rounded-full h-4 w-4 flex-shrink-0 flex items-center justify-center">
                                 <CheckCircle2 className="h-3 w-3" />
                             </span>
-                            )}
+                          )}
                           </div>
                           
                           {/* Loading spinner */}
@@ -687,69 +687,69 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
                   <div className="flex items-center gap-2 mt-3 text-sm text-green-600 animate-fade-in">
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Category selected! Click Next to continue.</span>
-                  </div>
-                )}
-              </div>
+                        </div>
+                  )}
+            </div>
             )}
             
             {/* Step 3: Details */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                {/* Date */}
-                <div className="grid gap-2">
+            {/* Date */}
+            <div className="grid gap-2">
                   <Label htmlFor="date" className="text-base font-medium">Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
                         variant={"outline"}
                         className={cn(
                           "w-full justify-start text-left font-normal h-10",
                           !date && "text-muted-foreground"
                         )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
                         {date ? format(date, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
+                  </Button>
+                </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={(date) => date && setDate(date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                {/* Note */}
-                <div className="grid gap-2">
-                  <Label htmlFor="note" className="text-base font-medium">Note (optional)</Label>
-                  <Textarea
-                    id="note"
-                    placeholder="Add a note about this transaction"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    rows={2}
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(date) => date && setDate(date)}
+                    initialFocus
                   />
-                </div>
-                
-                {/* Tags */}
-                <div className="grid gap-2">
+                </PopoverContent>
+              </Popover>
+          </div>
+          
+          {/* Note */}
+          <div className="grid gap-2">
+                  <Label htmlFor="note" className="text-base font-medium">Note (optional)</Label>
+            <Textarea
+              id="note"
+                    placeholder="Add a note about this transaction"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+            />
+          </div>
+          
+          {/* Tags */}
+          <div className="grid gap-2">
                   <Label htmlFor="tags" className="text-base font-medium">Tags (optional)</Label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="tags"
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="tags"
                       placeholder="Enter tags separated by commas"
                       className="pl-10"
-                      value={tags}
-                      onChange={(e) => setTags(e.target.value)}
-                    />
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+              />
                   </div>
                   <p className="text-xs text-muted-foreground">Example: grocery, personal, vacation</p>
-                </div>
-              </div>
+            </div>
+          </div>
             )}
             
             {/* Navigation buttons */}
@@ -785,13 +785,13 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
                       <span className={isMobile ? "hidden" : "inline"}>Delete</span>
                     </Button>
                   )}
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
+          <Button 
+            type="submit" 
+            disabled={isSubmitting}
                     className={cn(
                       type === 'expense' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
                     )}
-                  >
+          >
                     {isSubmitting ? (
                       <>
                         <span className="animate-spin mr-2">
@@ -805,7 +805,7 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
                     ) : (
                       existingTransaction ? 'Update Transaction' : 'Save Transaction'
                     )}
-                  </Button>
+          </Button>
                 </div>
               )}
             </div>

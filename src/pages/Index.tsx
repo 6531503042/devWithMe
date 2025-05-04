@@ -2,12 +2,31 @@ import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { CheckCircle, Clock, ListChecks, BarChart, Heart, Star, Coffee, Brain, ArrowRight, Github, Zap, BookOpen } from 'lucide-react';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { LanguageSwitcher } from '@/components/ui/language-switcher';
+import { 
+  CheckCircle, 
+  Clock, 
+  ListChecks, 
+  BarChart, 
+  Heart, 
+  Star, 
+  Coffee, 
+  Brain, 
+  ArrowRight, 
+  Github, 
+  Zap, 
+  BookOpen,
+  DollarSign,
+  Trello,
+  Kanban
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 const Index = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Redirect to dashboard if user is logged in
@@ -30,18 +49,31 @@ const Index = () => {
             <span className="font-bold text-xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">devWithMe</span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#why" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Why devWithMe</a>
-            <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">About Creator</a>
-            <a href="#donate" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Support Us</a>
+            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              {t('features')}
+            </a>
+            <a href="#why" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              {t('whyDevWithMe')}
+            </a>
+            <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              {t('aboutCreator')}
+            </a>
+            <a href="#donate" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              {t('supportUs')}
+            </a>
           </nav>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <Link to="/auth?mode=login">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </Link>
+              <Button variant="ghost" size="sm">
+                {t('login')}
+              </Button>
+              </Link>
             <Link to="/auth?mode=signup">
-              <Button size="sm">Sign up free</Button>
-            </Link>
+              <Button size="sm">
+                {t('signup')}
+              </Button>
+                </Link>
           </div>
         </div>
       </header>
@@ -56,24 +88,24 @@ const Index = () => {
             <div className="grid md:grid-cols-2 gap-8 items-center max-w-6xl mx-auto">
               <div className="text-left">
                 <Badge variant="outline" className="mb-4 px-3 py-1 bg-primary/10 text-primary border-primary/30">
-                  Built by students, for everyone
+                  {t('tagline')}
                 </Badge>
                 <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                  Boost your productivity and focus
+                  {t('title')}
                 </h1>
                 <p className="text-lg text-muted-foreground mb-8">
-                  An all-in-one productivity solution with task management, pomodoro timer, and habit tracking to help you achieve more while reducing stress.
+                  {t('subtitle')}
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 mb-8">
                   <Link to="/auth?mode=signup">
                     <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all">
-                      Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
+                      {t('getStarted')} <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
                   <a href="#features">
                     <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                      Explore Features
+                      {t('exploreFeatures')}
                     </Button>
                   </a>
                 </div>
@@ -88,7 +120,7 @@ const Index = () => {
                   />
                   <div className="absolute bottom-4 right-4 bg-white rounded-md shadow-md px-3 py-2 text-sm font-medium border border-primary/20">
                     <span className="flex items-center gap-2">
-                      <span className="text-primary">Clean Design</span>
+                      <span className="text-primary">{t('cleanDesign')}</span>
                       <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                     </span>
                   </div>
@@ -99,27 +131,27 @@ const Index = () => {
                     <div className="bg-green-100 text-green-600 rounded-full p-1.5">
                       <CheckCircle className="h-5 w-5" />
                     </div>
-                    <span className="font-medium text-sm">Focus Mode</span>
+                    <span className="font-medium text-sm">{t('focusMode')}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">Boost your concentration with our distraction-free workspace</div>
+                  <div className="text-xs text-muted-foreground">{t('focusModeDesc')}</div>
                   <div className="mt-3 flex items-center gap-1.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     <div className="h-1.5 w-1.5 rounded-full bg-green-300"></div>
                     <div className="h-1.5 w-1.5 rounded-full bg-green-300"></div>
-                    <span className="text-[10px] text-green-600 ml-1 font-medium">75% Focus</span>
-                  </div>
-                </div>
-                
+                    <span className="text-[10px] text-green-600 ml-1 font-medium">75% {t('focusLevel')}</span>
+          </div>
+        </div>
+
                 <div className="absolute -top-6 -right-6 bg-white rounded-lg shadow-lg p-4 max-w-[220px] border border-gray-100 transform hover:-translate-y-1 transition-all duration-300">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="bg-blue-100 text-blue-600 rounded-full p-1.5">
                       <Zap className="h-5 w-5" />
                     </div>
-                    <span className="font-medium text-sm">Track Progress</span>
+                    <span className="font-medium text-sm">{t('trackProgress')}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">Visualize your productivity with beautiful analytics and insights</div>
+                  <div className="text-xs text-muted-foreground">{t('trackProgressDesc')}</div>
                   <div className="mt-3 flex items-center gap-1">
                     <div className="h-2 bg-blue-200 rounded-full w-full flex-1">
                       <div className="h-2 bg-blue-500 rounded-full w-[65%]"></div>
@@ -136,15 +168,15 @@ const Index = () => {
         <section id="features" className="py-20 bg-gradient-to-b from-white to-gray-50">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <Badge variant="outline" className="mb-4 px-3 py-1">Features</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to stay productive</h2>
+              <Badge variant="outline" className="mb-4 px-3 py-1">{t('features')}</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('featuresTitle')}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                devWithMe combines all the essential tools for productivity in one beautiful interface.
+                {t('featuresSubtitle')}
               </p>
             </div>
 
             {/* Redesigned feature cards */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {/* Task Management card */}
               <div className="group relative flex flex-col bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -153,12 +185,12 @@ const Index = () => {
                   <div className="rounded-lg bg-green-100 text-green-600 w-12 h-12 flex items-center justify-center mb-4">
                     <CheckCircle className="h-6 w-6" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-green-600 transition-colors">Task Management</h3>
-                  <p className="text-muted-foreground text-sm flex-1">Create, organize and track your tasks with ease. Set due dates, priorities, and categories.</p>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-green-600 transition-colors">{t('taskManagement')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('taskManagementDesc')}</p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Organize</span>
-                      <span className="text-green-600 font-medium">Track Progress</span>
+                      <span className="text-muted-foreground">{t('organize')}</span>
+                      <span className="text-green-600 font-medium">{t('trackProgressShort')}</span>
                     </div>
                   </div>
                 </div>
@@ -172,11 +204,11 @@ const Index = () => {
                   <div className="rounded-lg bg-blue-100 text-blue-600 w-12 h-12 flex items-center justify-center mb-4">
                     <Clock className="h-6 w-6" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-blue-600 transition-colors">Pomodoro Timer</h3>
-                  <p className="text-muted-foreground text-sm flex-1">Boost your productivity with the Pomodoro technique. Work in focused intervals with timed breaks.</p>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-blue-600 transition-colors">{t('pomodoroTimer')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('pomodoroTimerDesc')}</p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Focus Mode</span>
+                      <span className="text-muted-foreground">{t('focusMode')}</span>
                       <span className="text-blue-600 font-medium">25:00</span>
                     </div>
                   </div>
@@ -191,12 +223,50 @@ const Index = () => {
                   <div className="rounded-lg bg-purple-100 text-purple-600 w-12 h-12 flex items-center justify-center mb-4">
                     <ListChecks className="h-6 w-6" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-purple-600 transition-colors">Habit Tracking</h3>
-                  <p className="text-muted-foreground text-sm flex-1">Build better habits with daily tracking, streaks, and progress visualization.</p>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-purple-600 transition-colors">{t('habitTracking')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('habitTrackingDesc')}</p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Build Streaks</span>
-                      <span className="text-purple-600 font-medium">🔥 7 Days</span>
+                      <span className="text-muted-foreground">{t('buildStreaks')}</span>
+                      <span className="text-purple-600 font-medium">🔥 7 {t('days')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Finance Tracker card */}
+              <div className="group relative flex flex-col bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="h-2 bg-emerald-500"></div>
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="rounded-lg bg-emerald-100 text-emerald-600 w-12 h-12 flex items-center justify-center mb-4">
+                    <DollarSign className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600 transition-colors">{t('financeTracking')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('financeTrackingDesc')}</p>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{t('monitorFinances')}</span>
+                      <span className="text-emerald-600 font-medium">{t('smartInsights')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kanban Board card */}
+              <div className="group relative flex flex-col bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="h-2 bg-indigo-500"></div>
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="rounded-lg bg-indigo-100 text-indigo-600 w-12 h-12 flex items-center justify-center mb-4">
+                    <Trello className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-indigo-600 transition-colors">{t('kanbanBoard')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('kanbanBoardDesc')}</p>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{t('visualOrganize')}</span>
+                      <span className="text-indigo-600 font-medium">{t('trackProjects')}</span>
                     </div>
                   </div>
                 </div>
@@ -210,12 +280,12 @@ const Index = () => {
                   <div className="rounded-lg bg-orange-100 text-orange-600 w-12 h-12 flex items-center justify-center mb-4">
                     <BarChart className="h-6 w-6" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-orange-600 transition-colors">Insightful Analytics</h3>
-                  <p className="text-muted-foreground text-sm flex-1">Understand your productivity patterns with detailed statistics and visualizations.</p>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-orange-600 transition-colors">{t('analytics')}</h3>
+                  <p className="text-muted-foreground text-sm flex-1">{t('analyticsDesc')}</p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Visualize</span>
-                      <span className="text-orange-600 font-medium">Track Trends</span>
+                      <span className="text-muted-foreground">{t('visualize')}</span>
+                      <span className="text-orange-600 font-medium">{t('trackTrends')}</span>
                     </div>
                   </div>
                 </div>
@@ -228,10 +298,10 @@ const Index = () => {
         <section id="why" className="py-20 bg-gradient-to-b from-gray-50 to-white">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <Badge variant="outline" className="mb-4 px-3 py-1">Why Choose Us</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Made with passion and purpose</h2>
+              <Badge variant="outline" className="mb-4 px-3 py-1">{t('whyDevWithMe')}</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('whyTitle')}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                devWithMe was built to solve real productivity challenges faced by students and professionals alike.
+                {t('whySubtitle')}
               </p>
             </div>
 
@@ -240,24 +310,24 @@ const Index = () => {
                 <div className="rounded-full bg-green-100 w-12 h-12 flex items-center justify-center mb-4">
                   <CheckCircle className="w-6 h-6 text-green-600" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">Privacy-First Approach</h3>
-                <p className="text-muted-foreground">Your data stays private. We don't sell your information or track your activities.</p>
+                <h3 className="text-lg font-bold mb-2">{t('privacyFirst')}</h3>
+                <p className="text-muted-foreground">{t('privacyDesc')}</p>
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-all">
                 <div className="rounded-full bg-blue-100 w-12 h-12 flex items-center justify-center mb-4">
                   <Star className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">Beautiful User Experience</h3>
-                <p className="text-muted-foreground">Designed with aesthetics and usability in mind for a delightful productivity experience.</p>
+                <h3 className="text-lg font-bold mb-2">{t('beautifulUX')}</h3>
+                <p className="text-muted-foreground">{t('uxDesc')}</p>
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-all">
                 <div className="rounded-full bg-purple-100 w-12 h-12 flex items-center justify-center mb-4">
                   <Heart className="w-6 h-6 text-purple-600" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">Built by Students</h3>
-                <p className="text-muted-foreground">Created from the ground up by students who understand the needs of productive people.</p>
+                <h3 className="text-lg font-bold mb-2">{t('builtByStudents')}</h3>
+                <p className="text-muted-foreground">{t('studentsDesc')}</p>
               </div>
             </div>
           </div>
@@ -268,10 +338,10 @@ const Index = () => {
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               <div className="text-center mb-10">
-                <Badge variant="outline" className="mb-4 px-3 py-1">About the Creator</Badge>
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Bengi</h2>
+                <Badge variant="outline" className="mb-4 px-3 py-1">{t('aboutCreator')}</Badge>
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('aboutTitle')}</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  The mind behind devWithMe
+                  {t('aboutSubtitle')}
                 </p>
               </div>
 
@@ -281,9 +351,9 @@ const Index = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-2">Bengi</h3>
-                  <p className="text-sm text-muted-foreground mb-3">3rd Year Software Engineering Student at Mae Fah Luang University</p>
+                  <p className="text-sm text-muted-foreground mb-3">{t('studentTitle')}</p>
                   <p className="mb-4">
-                    As a passionate software engineering student, I created devWithMe to address the productivity challenges students face. I believe in creating tools that help people achieve more while maintaining balance and reducing stress.
+                    {t('aboutText')}
                   </p>
                   <div className="flex gap-3">
                     <a href="https://github.com/6531503042" target="_blank" rel="noopener noreferrer">
@@ -303,24 +373,24 @@ const Index = () => {
         <section id="donate" className="py-20 bg-gradient-to-b from-gray-50 to-white">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto text-center">
-              <Badge variant="outline" className="mb-4 px-3 py-1 bg-amber-100 text-amber-700 border-amber-200">Support Us</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Help us keep devWithMe free for everyone</h2>
+              <Badge variant="outline" className="mb-4 px-3 py-1 bg-amber-100 text-amber-700 border-amber-200">{t('supportUs')}</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('supportTitle')}</h2>
               <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-                devWithMe is a passion project built by students. Your support helps us maintain and improve the platform while keeping it free for all users.
+                {t('supportSubtitle')}
               </p>
 
               <Card className="overflow-hidden border border-amber-200 bg-amber-50/50 shadow-md hover:shadow-lg transition-all">
                 <CardContent className="pt-6 pb-6">
                   <div className="flex flex-col items-center">
                     <Coffee className="w-10 h-10 text-amber-600 mb-4" />
-                    <h3 className="text-xl font-bold mb-2">Buy me a coffee</h3>
+                    <h3 className="text-xl font-bold mb-2">{t('coffeeTitle')}</h3>
                     <p className="text-muted-foreground mb-6 max-w-lg">
-                      Your support helps cover hosting costs and enables us to continue developing new features.
+                      {t('coffeeDesc')}
                     </p>
                     <a href="https://www.buymeacoffee.com/bengi" target="_blank" rel="noopener noreferrer" className="inline-block">
                       <Button className="bg-amber-600 hover:bg-amber-700 flex items-center gap-2">
                         <Coffee className="h-4 w-4" />
-                        <span>Support the Project</span>
+                        <span>{t('supportButton')}</span>
                       </Button>
                     </a>
                   </div>
@@ -334,13 +404,13 @@ const Index = () => {
         <section className="py-16 bg-gradient-to-r from-primary to-purple-600">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Ready to boost your productivity?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">{t('ctaTitle')}</h2>
               <p className="text-white/80 mb-8 max-w-2xl mx-auto">
-                Join thousands of students and professionals who have transformed their productivity with devWithMe.
+                {t('ctaSubtitle')}
               </p>
               <Link to="/auth?mode=signup">
                 <Button size="lg" className="bg-white text-primary hover:bg-white/90">
-                  Get Started Now <ArrowRight className="ml-2 h-4 w-4" />
+                  {t('getStartedNow')} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -356,24 +426,24 @@ const Index = () => {
               <Brain className="h-5 w-5 text-primary" />
               <span className="font-bold text-lg bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">devWithMe</span>
             </div>
-            
+
             <div className="flex gap-6 mb-4 md:mb-0 flex-wrap justify-center">
-              <a href="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">Features</a>
-              <a href="#why" className="text-sm text-muted-foreground hover:text-primary transition-colors">Why devWithMe</a>
-              <a href="#about" className="text-sm text-muted-foreground hover:text-primary transition-colors">About</a>
-              <a href="#donate" className="text-sm text-muted-foreground hover:text-primary transition-colors">Support</a>
+              <a href="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">{t('features')}</a>
+              <a href="#why" className="text-sm text-muted-foreground hover:text-primary transition-colors">{t('whyDevWithMe')}</a>
+              <a href="#about" className="text-sm text-muted-foreground hover:text-primary transition-colors">{t('aboutCreator')}</a>
+              <a href="#donate" className="text-sm text-muted-foreground hover:text-primary transition-colors">{t('supportUs')}</a>
               <a href="https://github.com/6531503042" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
                 <Github className="h-3.5 w-3.5" /> GitHub
               </a>
             </div>
-            
+
             <div className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} devWithMe by Bengi
+              {t('copyright').replace('2023', new Date().getFullYear().toString())}
             </div>
           </div>
         </div>
       </footer>
-    </div>
+      </div>
   );
 };
 
