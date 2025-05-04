@@ -6,7 +6,7 @@ import PageContainer from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, AlertCircle, Activity, CheckCircle2, Award, TrendingUp, Clock, RefreshCw, CalendarCheck } from 'lucide-react';
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import ProductivityTrends from '@/components/dashboard/ProductivityTrends';
 import { useTransactions, usePomodoroSessions, useTasks } from '@/hooks/use-cached-data';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,83 +109,93 @@ const DashboardPage = () => {
 
   // Calculate dashboard statistics
   const calculateStats = (pomodoroData: PomodoroSession[], tasksData: Task[]): DashboardStats => {
-    try {
-      // Check for empty data
-      if (!pomodoroData.length && !tasksData.length) {
-        return DEFAULT_STATS;
-      }
-      
-      // Focus time calculation
-      const totalMinutes = pomodoroData.reduce((total, session) => {
-        return total + Math.floor((session.duration || 0) / 60);
-      }, 0);
-      
+    // Total focus time
+    const totalMinutes = pomodoroData.reduce((sum, session) => {
+      return sum + (session.duration || 0);
+    }, 0);
+    
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     const focusTime = `${hours}h ${minutes}m`;
     
-      // Task completion stats
-      const completedTasks = tasksData.filter(task => task.completed).length;
-      const taskCompletionRate = tasksData.length 
-        ? Math.round((completedTasks / tasksData.length) * 100) 
-        : 0;
-      
-      // Calculate streak (simplified)
-      const streak = Math.max(1, Math.min(10, Math.floor(Math.random() * 10))); // Placeholder
-      
-      // Calculate focus time change (simplified)
-      const focusChange = Math.floor(Math.random() * 30) - 10; // Random between -10 and +20
-      
-      // Calculate tasks change (simplified)
-      const tasksChange = Math.floor(Math.random() * 40) - 15; // Random between -15 and +25
-      
-      return {
+    // Completed tasks
+    const completedTasks = tasksData.filter(task => task.completed).length;
+    
+    // Calculate task success rate
+    const taskSuccessRate = tasksData.length > 0 
+      ? Math.round((completedTasks / tasksData.length) * 100) 
+      : 0;
+    
+    // Calculate streak (longest current streak from all habit tasks)
+    const currentStreak = tasksData.reduce((maxStreak, task) => {
+      return Math.max(maxStreak, task.streak || 0);
+    }, 0);
+    
+    // Calculate change in focus time (last 7 days vs previous 7 days)
+    const now = new Date();
+    const sevenDaysAgo = subDays(now, 7);
+    const fourteenDaysAgo = subDays(now, 14);
+    
+    const recentSessions = pomodoroData.filter(session => {
+      const sessionDate = new Date(session.completed_at);
+      return isAfter(sessionDate, sevenDaysAgo);
+    });
+    
+    const previousSessions = pomodoroData.filter(session => {
+      const sessionDate = new Date(session.completed_at);
+      return isAfter(sessionDate, fourteenDaysAgo) && isBefore(sessionDate, sevenDaysAgo);
+    });
+    
+    const recentFocusMinutes = recentSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const previousFocusMinutes = previousSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    
+    // Calculate percentage change
+    const focusChange = previousFocusMinutes > 0 
+      ? Math.round(((recentFocusMinutes - previousFocusMinutes) / previousFocusMinutes) * 100) 
+      : (recentFocusMinutes > 0 ? 100 : 0);
+    
+    // Calculate tasks completed change
+    const recentCompletedTasks = tasksData.filter(task => {
+      if (!task.completed) return false;
+      // Tasks don't have a completion timestamp, so we'll use creation date as a fallback
+      // This is an approximation and should be improved if completion dates are added
+      return isAfter(new Date(task.due_date || new Date()), sevenDaysAgo);
+    }).length;
+    
+    const tasksChange = completedTasks > 0 ? Math.round((recentCompletedTasks / completedTasks) * 100) - 100 : 0;
+    
+    return {
       focusTime,
       completedTasks,
-        streak,
-        taskSuccess: `${taskCompletionRate}%`,
-        focusChange,
-        tasksChange
-      };
-    } catch (error) {
-      console.error('Error calculating stats:', error);
-      return DEFAULT_STATS;
-    }
+      streak: currentStreak,
+      taskSuccess: `${taskSuccessRate}%`,
+      focusChange,
+      tasksChange
+    };
   };
 
   // Get upcoming tasks (due in the next 7 days)
   const getUpcomingTasks = () => {
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    // Get current date and date 7 days in the future
+    const today = startOfDay(new Date());
+    const nextWeek = addDays(today, 7);
     
-    // Find tasks with due dates in the next 7 days, excluding completed tasks
-    return tasks
-      .filter(task => {
-        // Skip completed tasks
-        if (task.completed) return false;
-        
-        // Skip tasks without due dates
-        if (!task.due_date) return false;
-        
-        try {
-          // Parse the due date
-          const dueDate = new Date(task.due_date);
-          
-          // Check if it's between today and next week
-          return dueDate >= today && dueDate <= nextWeek;
-        } catch (e) {
-          console.error('Error parsing due date:', task.due_date, e);
-          return false;
-        }
-      })
+    // Filter tasks with due dates in the next 7 days
+    const upcomingTasks = tasks.filter(task => {
+      if (!task.due_date || task.completed) return false;
+      
+      const dueDate = new Date(task.due_date);
+      return isAfter(dueDate, today) && isBefore(dueDate, nextWeek);
+    });
+    
+    // Format relevant data for display
+    return upcomingTasks
       .sort((a, b) => {
-        // Sort by due date (ascending)
-        const dateA = new Date(a.due_date || '');
-        const dateB = new Date(b.due_date || '');
+        const dateA = new Date(a.due_date!);
+        const dateB = new Date(b.due_date!);
         return dateA.getTime() - dateB.getTime();
       })
-      .slice(0, 5); // Show at most 5 upcoming tasks
+      .slice(0, 5); // Only take the first 5 tasks
   };
 
   // Format pomodoro data for charts
@@ -227,7 +237,7 @@ const DashboardPage = () => {
     
     // Convert to chart data format
     const data = Object.entries(categoryCount)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
       .sort((a, b) => b.value - a.value); // Sort by count, descending
     
     // Return top 5 categories, merge others
@@ -526,29 +536,39 @@ const DashboardPage = () => {
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
-                            outerRadius={90}
+                        outerRadius={90}
                         paddingAngle={5}
                         dataKey="value"
                         label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            animationDuration={1000}
+                        labelLine={false}
+                        animationDuration={1000}
                       >
                         {taskChartData.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={COLORS[index % COLORS.length]} 
-                                strokeWidth={1}
-                              />
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]} 
+                            strokeWidth={1}
+                          />
                         ))}
                       </Pie>
-                          <Legend layout="horizontal" verticalAlign="bottom" align="center" />
-                          <Tooltip 
-                            formatter={(value, name) => [`${value} tasks`, name]}
-                            contentStyle={{
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                              border: '1px solid var(--border)'
-                            }}
-                          />
+                      <Legend 
+                        layout="horizontal" 
+                        verticalAlign="bottom" 
+                        align="center" 
+                        formatter={(value, entry, index) => (
+                          <span style={{ color: COLORS[index % COLORS.length], fontWeight: 500 }}>
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => [`${value} tasks`, name]}
+                        contentStyle={{
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          border: '1px solid var(--border)'
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>

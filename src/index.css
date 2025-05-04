@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Improved Thai language support */
+:lang(th) {
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+  word-break: keep-all;
+}
+
+/* Thai language headings with better spacing */
+h1:lang(th), 
+h2:lang(th), 
+h3:lang(th), 
+h4:lang(th) {
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+/* Better word spacing for Thai paragraphs */
+p:lang(th) {
+  word-spacing: 0.1em;
+}
+
 @layer base {
   :root {
     --background: 260 50% 97%;
@@ -104,6 +125,7 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'DM Sans', 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   }
 }
 

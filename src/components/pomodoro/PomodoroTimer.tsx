@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import type { Database } from '@/integrations/supabase/types';
 import { Slider } from '@/components/ui/slider';
 import { Timer } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 type PomodoroSession = Database['public']['Tables']['pomodoro_sessions']['Row'];
 type Task = Database['public']['Tables']['tasks']['Row'];
@@ -214,6 +215,20 @@ const ALARM_SOUND_URL = 'https://cdn.freesound.org/previews/219/219244_4082826-l
 // Add timer mode type
 type TimerMode = 'pomodoro' | 'shortBreak' | 'longBreak';
 
+// Add constants for local storage keys
+const TIMER_STATE_KEY = 'pomodoro-timer-state';
+const TIMER_END_TIME_KEY = 'pomodoro-end-time';
+const TIMER_MODE_KEY = 'pomodoro-mode';
+const TIMER_ACTIVE_KEY = 'pomodoro-is-active';
+const TIMER_PAUSED_KEY = 'pomodoro-is-paused';
+const TIMER_REMAINING_KEY = 'pomodoro-time-remaining';
+
+// Create a global event to sync timer across tabs/components
+const createTimerSyncEvent = () => {
+  const event = new CustomEvent('pomodoro-timer-sync', { detail: { synced: true } });
+  window.dispatchEvent(event);
+};
+
 const PomodoroTimer = () => {
   const [mode, setModeOriginal] = useState<keyof typeof timerModes>('pomodoro');
   const [timerMode, setTimerMode] = useState<TimerMode>('pomodoro');
@@ -251,17 +266,15 @@ const PomodoroTimer = () => {
   const glowPulseRef = useRef<NodeJS.Timeout | null>(null);
   const spotifyEmbedRef = useRef<HTMLIFrameElement | null>(null);
   const youtubeEmbedRef = useRef<HTMLIFrameElement | null>(null);
+  const isInitialLoad = useRef<boolean>(true);
+  const isTimerRunningRef = useRef<boolean>(false);
 
   const { user, isInitialized } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Load data when component mounts and user status is resolved, but don't block UI
-  useEffect(() => {
-    if (isInitialized) {
-      fetchUserData();
-    }
-  }, [user, isInitialized]);
-
+  // Define fetchUserData function for loading data
   const fetchUserData = async () => {
     // Only fetch if user is logged in
     if (!user) {
@@ -320,6 +333,445 @@ const PomodoroTimer = () => {
     } finally {
       setSessionLoading(false);
       setTaskLoading(false);
+    }
+  };
+
+  // Load data when component mounts and user status is resolved
+  useEffect(() => {
+    if (isInitialized) {
+      fetchUserData();
+    }
+  }, [user, isInitialized]);
+
+  // Function to animate the timer glow
+  const pulseTimerGlow = () => {
+    setIsGlowing(true);
+    // Clear any existing pulse animation
+    if (glowPulseRef.current) {
+      clearTimeout(glowPulseRef.current);
+    }
+    // Set timeout to remove glow effect after animation completes
+    glowPulseRef.current = setTimeout(() => {
+      setIsGlowing(false);
+      glowPulseRef.current = null;
+    }, 2000);
+  };
+
+  // Enhanced implementation of saveSession with proper types
+  const saveSession = async (duration: number) => {
+    // Save session to Supabase if user is logged in
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from('pomodoro_sessions')
+          .insert({
+            user_id: user.id,
+            task_id: selectedTaskId,
+            duration: duration,
+            type: mode, // Use type field instead of mode for database
+            completed_at: new Date().toISOString()
+          });
+        
+        if (error) throw error;
+        
+        // After successful save, refresh sessions data
+        fetchUserData();
+      } catch (error) {
+        console.error('Error saving pomodoro session:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save your session. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    }
+    
+    // Clear localStorage timer state since timer is complete
+    localStorage.removeItem(TIMER_END_TIME_KEY);
+    localStorage.removeItem(TIMER_ACTIVE_KEY);
+    saveTimerState();
+  };
+
+  // Function to save timer state to localStorage
+  const saveTimerState = () => {
+    try {
+      // Save current timer state
+      localStorage.setItem(TIMER_STATE_KEY, JSON.stringify({
+        timeRemaining,
+        mode,
+        pomodorosCompleted,
+        updatedAt: new Date().getTime(),
+      }));
+      
+      // Save whether timer is active and when it will end
+      localStorage.setItem(TIMER_ACTIVE_KEY, JSON.stringify(isActive));
+      if (isActive && endTimeRef.current) {
+        localStorage.setItem(TIMER_END_TIME_KEY, JSON.stringify(endTimeRef.current));
+      } else {
+        localStorage.removeItem(TIMER_END_TIME_KEY);
+      }
+      
+      // Save current mode
+      localStorage.setItem(TIMER_MODE_KEY, mode);
+      
+      // Dispatch event to sync other instances
+      createTimerSyncEvent();
+    } catch (error) {
+      console.error('Error saving timer state:', error);
+    }
+  };
+
+  // Improve the loadTimerState function to better handle edge cases
+  const loadTimerState = () => {
+    try {
+      console.log('[PomodoroTimer] Loading timer state from localStorage');
+      
+      // Load timer state (mode, remaining time)
+      const savedStateStr = localStorage.getItem(TIMER_STATE_KEY);
+      if (savedStateStr) {
+        const savedState = JSON.parse(savedStateStr);
+        
+        // Set the timer mode and remaining time
+        setTimeRemaining(savedState.timeRemaining);
+        setModeOriginal(savedState.mode);
+        setTimerMode(savedState.mode);
+        setPomodorosCompleted(savedState.pomodorosCompleted || 0);
+        
+        console.log(`[PomodoroTimer] Loaded state: mode=${savedState.mode}, time=${savedState.timeRemaining}`);
+      }
+      
+      // Check if timer is active
+      const savedActiveStr = localStorage.getItem(TIMER_ACTIVE_KEY);
+      const wasActive = savedActiveStr === 'true';
+      
+      // Check if timer is paused
+      const savedPausedStr = localStorage.getItem(TIMER_PAUSED_KEY);
+      const wasPaused = savedPausedStr === 'true';
+      
+      if (wasActive) {
+        console.log(`[PomodoroTimer] Timer was active, paused=${wasPaused}`);
+        
+        if (wasPaused) {
+          // For paused timers, get saved remaining time
+          const remainingStr = localStorage.getItem(TIMER_REMAINING_KEY);
+          if (remainingStr) {
+            const remaining = parseInt(remainingStr, 10);
+            console.log(`[PomodoroTimer] Resuming paused timer with ${remaining}s remaining`);
+            setTimeRemaining(remaining);
+            setIsActive(false); // Set to inactive because it's paused
+          }
+        } else {
+          // For active timers, calculate from end time
+          const savedEndTimeStr = localStorage.getItem(TIMER_END_TIME_KEY);
+          if (savedEndTimeStr) {
+            const endTime = JSON.parse(savedEndTimeStr);
+            const now = new Date().getTime();
+            
+            // Calculate remaining time
+            const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+            
+            if (remaining > 0) {
+              console.log(`[PomodoroTimer] Resuming active timer with ${remaining}s remaining`);
+              // Restore timer with correct remaining time
+              setTimeRemaining(remaining);
+              endTimeRef.current = endTime;
+              setIsActive(true);
+              
+              // Start timer with corrected time - add a small delay for better UI rendering
+              setTimeout(() => {
+                startTimerWithSavedState(remaining);
+              }, 50);
+            } else {
+              // Timer should have completed already
+              console.log('[PomodoroTimer] Timer should have completed, resetting');
+              handleTimerCompletion();
+              setIsActive(false);
+              endTimeRef.current = null;
+              saveTimerState();
+            }
+          }
+        }
+      } else {
+        console.log('[PomodoroTimer] No active timer found');
+      }
+      
+      // Load mode
+      const savedMode = localStorage.getItem(TIMER_MODE_KEY);
+      if (savedMode && timerModes[savedMode as keyof typeof timerModes]) {
+        console.log(`[PomodoroTimer] Setting mode to ${savedMode}`);
+        setModeOriginal(savedMode as keyof typeof timerModes);
+        setTimerMode(savedMode as TimerMode);
+      }
+    } catch (error) {
+      console.error('[PomodoroTimer] Error loading timer state:', error);
+    }
+  };
+
+  // Enhance the startTimerWithSavedState function to be more reliable
+  const startTimerWithSavedState = (seconds: number) => {
+    console.log(`[PomodoroTimer] Starting timer with ${seconds}s remaining`);
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Make sure state is properly set
+    setIsActive(true);
+    localStorage.setItem(TIMER_ACTIVE_KEY, 'true');
+    localStorage.setItem(TIMER_PAUSED_KEY, 'false');
+    
+    // Set up interval for countdown
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prevTime => {
+        if (prevTime <= 1) {
+          handleTimerCompletion();
+          return 0;
+        }
+        
+        // Save state every 5 seconds
+        if (prevTime % 5 === 0) {
+          saveTimerState();
+        }
+        
+        return prevTime - 1;
+      });
+    }, 1000);
+    
+    // Create sync event to notify other components
+    createTimerSyncEvent();
+  };
+
+  // Listen for timer sync events from other components
+  useEffect(() => {
+    // Function to handle timer syncing from other components
+    const handleTimerSync = () => {
+      if (location.pathname.includes('/pomodoro')) {
+        console.log('[PomodoroTimer] Received timer sync event on pomodoro page');
+        
+        // Check if there's an active timer
+        const activeStr = localStorage.getItem(TIMER_ACTIVE_KEY);
+        const isActive = activeStr === 'true';
+        
+        if (isActive) {
+          // Only reload state if we're not already active
+          // This prevents double loading and flickering
+          if (!isTimerRunningRef.current) {
+            console.log('[PomodoroTimer] Loading timer state from sync event');
+            loadTimerState();
+          }
+        }
+      }
+    };
+    
+    // Set up the listener for timer sync events
+    window.addEventListener('pomodoro-timer-sync', handleTimerSync);
+    
+    return () => {
+      window.removeEventListener('pomodoro-timer-sync', handleTimerSync);
+    };
+  }, [location.pathname]);
+
+  // Add a separate useEffect to handle the initial load and navigation state
+  useEffect(() => {
+    // Check if we're coming from the GlobalTimerStatus component
+    const isNavigatingBack = sessionStorage.getItem('pomodoro-navigating-back') === 'true';
+    const navigationTimestamp = sessionStorage.getItem('pomodoro-navigation-timestamp');
+    
+    // Get location state if available
+    const locationState = location.state as { 
+      preserveTimer?: boolean; 
+      timeRemaining?: number;
+      isTimerPaused?: boolean;
+    } | null;
+    
+    console.log('[PomodoroTimer] Initializing timer, navigation back:', isNavigatingBack);
+    
+    if (isNavigatingBack || (locationState && locationState.preserveTimer)) {
+      console.log('[PomodoroTimer] Navigation detected, preserving timer state');
+      
+      // Get active and pause state from localStorage
+      const activeStr = localStorage.getItem(TIMER_ACTIVE_KEY);
+      const isActive = activeStr === 'true';
+      const pausedStr = localStorage.getItem(TIMER_PAUSED_KEY);
+      const isPaused = pausedStr === 'true';
+      
+      // For paused timers, get saved remaining time and update state directly
+      if (isPaused) {
+        const remainingStr = localStorage.getItem(TIMER_REMAINING_KEY);
+        if (remainingStr) {
+          const remaining = parseInt(remainingStr, 10);
+          console.log(`[PomodoroTimer] Setting paused timer with ${remaining}s remaining`);
+          
+          // Update local state
+          setTimeRemaining(remaining);
+          setIsActive(false);
+          
+          // Get and set mode
+          const savedMode = localStorage.getItem(TIMER_MODE_KEY);
+          if (savedMode && timerModes[savedMode as keyof typeof timerModes]) {
+            setModeOriginal(savedMode as keyof typeof timerModes);
+            setTimerMode(savedMode as TimerMode);
+          }
+        }
+      } 
+      // For active timers, calculate from end time and restart
+      else if (isActive) {
+        const endTimeStr = localStorage.getItem(TIMER_END_TIME_KEY);
+        if (endTimeStr) {
+          const endTime = JSON.parse(endTimeStr);
+          const now = new Date().getTime();
+          
+          // Calculate remaining time
+          const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+          
+          console.log(`[PomodoroTimer] Restoring active timer with ${remaining}s remaining`);
+          if (remaining > 0) {
+            // Restore timer with correct remaining time
+            setTimeRemaining(remaining);
+            endTimeRef.current = endTime;
+            setIsActive(true);
+            
+            // Get and set mode
+            const savedMode = localStorage.getItem(TIMER_MODE_KEY);
+            if (savedMode && timerModes[savedMode as keyof typeof timerModes]) {
+              setModeOriginal(savedMode as keyof typeof timerModes);
+              setTimerMode(savedMode as TimerMode);
+            }
+            
+            // Start timer with corrected time after a short delay
+            // This ensures the UI is ready
+            setTimeout(() => {
+              startTimerWithSavedState(remaining);
+            }, 100);
+          }
+        }
+      }
+    } else if (isInitialLoad.current) {
+      // Normal initial load, not coming from navigation
+      console.log('[PomodoroTimer] Normal initial load, checking for saved state');
+      loadTimerState();
+    }
+    
+    // Clear the navigation flags
+    sessionStorage.removeItem('pomodoro-navigating-back');
+    sessionStorage.removeItem('pomodoro-navigation-timestamp');
+    
+    // Mark as initialized
+    isInitialLoad.current = false;
+    
+    // Update the timer running ref
+    isTimerRunningRef.current = isActive;
+  }, []);
+
+  // Save timer state when important values change
+  useEffect(() => {
+    if (isActive) {
+      saveTimerState();
+    }
+  }, [isActive, timeRemaining, mode, pomodorosCompleted]);
+
+  // Modified toggle timer to update local storage
+  const toggleTimer = () => {
+    if (isActive) {
+      // Pause the timer
+      pauseTimer();
+      
+      // Update localStorage for pause state
+      localStorage.setItem(TIMER_PAUSED_KEY, 'true');
+      localStorage.setItem(TIMER_REMAINING_KEY, JSON.stringify(timeRemaining));
+      
+      saveTimerState();
+    } else {
+      // Start/Resume the timer
+      startTimer();
+      
+      // Update localStorage for active state
+      localStorage.setItem(TIMER_PAUSED_KEY, 'false');
+      
+      // Save the end time for later recovery
+      const durationInMs = timeRemaining * 1000;
+      const endTime = new Date().getTime() + durationInMs;
+      endTimeRef.current = endTime;
+      
+      saveTimerState();
+    }
+    
+    // Dispatch event to notify other components that timer was toggled
+    setTimeout(() => {
+      const event = new CustomEvent('pomodoro-timer-toggled');
+      window.dispatchEvent(event);
+    }, 10);
+  };
+
+  // Update the handleTimerCompletion function to use our fixed saveSession implementation
+  // Replace the duplicate handleTimerCompletion function
+  const handleTimerCompletion = () => {
+    // Clear the interval
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Clear end time reference
+    endTimeRef.current = null;
+    
+    // Play alarm sound
+    if (alarmAudioRef.current) {
+      alarmAudioRef.current.play().catch(err => {
+        console.error('Failed to play alarm sound:', err);
+      });
+    }
+    
+    // Save the session
+    saveSession(timerModes[mode]);
+    
+    // Show toast notification to alert the user
+    toast({
+      title: 'Timer Complete!',
+      description: `${mode === 'pomodoro' ? 'Focus' : 'Break'} session completed.`,
+      action: (
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={() => navigate('/pomodoro')}
+        >
+          View Timer
+        </Button>
+      ),
+    });
+    
+    // Update completed pomodoros if this was a work session
+    if (mode === 'pomodoro') {
+      setPomodorosCompleted(prev => prev + 1);
+    }
+    
+    // Update mode for next session based on pomodoro technique rules
+    const nextMode = getNextMode();
+    setModeOriginal(nextMode);
+    setTimerMode(nextMode as TimerMode);
+    
+    // Reset the timer to the duration for the new mode
+    setTimeRemaining(timerModes[nextMode]);
+    
+    // Update state to inactive
+    setIsActive(false);
+    
+    // Pulse the timer to draw attention
+    pulseTimerGlow();
+    
+    // Update localStorage state
+    saveTimerState();
+  };
+
+  // Function to determine next mode
+  const getNextMode = () => {
+    if (mode === 'pomodoro') {
+      // After every 4th pomodoro, take a long break
+      return ((pomodorosCompleted + 1) % 4 === 0) ? 'longBreak' : 'shortBreak';
+    } else {
+      // After any break, go back to pomodoro
+      return 'pomodoro';
     }
   };
 
@@ -820,44 +1272,6 @@ const PomodoroTimer = () => {
     };
   }, [currentSound, isSoundPlaying]);
 
-  const saveSession = async (duration: number) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('pomodoro_sessions')
-        .insert({
-          type: mode,
-          duration,
-          completed_at: new Date().toISOString(),
-          user_id: user.id,
-          task_id: selectedTaskId
-        });
-
-      if (error) throw error;
-      
-      // Refresh sessions list
-      await fetchUserData();
-      
-      toast({
-        title: 'Session Complete',
-        description: `${mode} session completed successfully!`,
-        variant: 'default'
-      });
-    } catch (error) {
-      console.error('Error saving session:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save session, but you completed the timer!',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const toggleTimer = () => {
-    setIsActive(!isActive);
-  };
-
   const resetTimer = () => {
     // Update state
     setTimeRemaining(timerModes[mode]);
@@ -1226,13 +1640,53 @@ const PomodoroTimer = () => {
 
   // Define timer functions
   const startTimer = () => {
-    // Clear any previously set end time when starting timer
-    endTimeRef.current = null;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
     setIsActive(true);
+    
+    // Set the end time for recovery if page is refreshed or changed
+    const durationInMs = timeRemaining * 1000;
+    const endTime = new Date().getTime() + durationInMs;
+    endTimeRef.current = endTime;
+    
+    // Start interval for countdown
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prevTime => {
+        if (prevTime <= 1) {
+          // Timer complete
+          handleTimerCompletion();
+          return 0;
+        }
+        
+        // Save state periodically to ensure persistence
+        if (prevTime % 5 === 0) {
+          saveTimerState();
+        }
+        
+        return prevTime - 1;
+      });
+    }, 1000);
+    
+    // Save timer state immediately when starting
+    saveTimerState();
+    
+    // Create sync event to notify other components
+    createTimerSyncEvent();
   };
   
   const pauseTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     setIsActive(false);
+    
+    // Also update localStorage
+    localStorage.setItem(TIMER_PAUSED_KEY, 'true');
+    localStorage.setItem(TIMER_REMAINING_KEY, JSON.stringify(timeRemaining));
   };
   
   // Helper getter for current timer duration
@@ -1528,6 +1982,149 @@ const PomodoroTimer = () => {
       } catch (error) {
         console.error('Error during cleanup:', error);
       }
+    };
+  }, []);
+
+  // Add an effect to handle timer toggle events from the GlobalTimerStatus component
+  useEffect(() => {
+    const handleToggleTimer = () => {
+      console.log('[PomodoroTimer] Received toggle timer event');
+      // Check if we need to pause or resume the timer
+      const isPausedStr = localStorage.getItem(TIMER_PAUSED_KEY);
+      const isPaused = isPausedStr === 'true';
+      
+      if (isPaused && isActive) {
+        // Pause the timer
+        console.log('[PomodoroTimer] Pausing timer from global event');
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        
+        // Update state
+        setIsActive(false);
+        
+        // Save current time remaining
+        localStorage.setItem(TIMER_REMAINING_KEY, JSON.stringify(timeRemaining));
+        
+        // Save timer state
+        saveTimerState();
+      } 
+      else if (isPaused === false && !isActive) {
+        // Resume the timer
+        console.log('[PomodoroTimer] Resuming timer from global event');
+        
+        // Get the saved time remaining
+        const remainingStr = localStorage.getItem(TIMER_REMAINING_KEY);
+        let remaining = timeRemaining;
+        
+        if (remainingStr) {
+          remaining = JSON.parse(remainingStr);
+          setTimeRemaining(remaining);
+        }
+        
+        // Set the new end time
+        const now = new Date().getTime();
+        const newEndTime = now + (remaining * 1000);
+        endTimeRef.current = newEndTime;
+        localStorage.setItem(TIMER_END_TIME_KEY, JSON.stringify(newEndTime));
+        
+        // Start the timer
+        startTimerWithSavedState(remaining);
+      }
+      
+      // Create sync event to notify other components
+      createTimerSyncEvent();
+    };
+    
+    const handleStopTimer = () => {
+      console.log('[PomodoroTimer] Received stop timer event');
+      // Stop the timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+      // Reset state
+      setIsActive(false);
+      endTimeRef.current = null;
+      resetTimer();
+      
+      // Clear localStorage
+      localStorage.setItem(TIMER_ACTIVE_KEY, 'false');
+      localStorage.removeItem(TIMER_END_TIME_KEY);
+      localStorage.removeItem(TIMER_PAUSED_KEY);
+      localStorage.removeItem(TIMER_REMAINING_KEY);
+      
+      // Create sync event
+      createTimerSyncEvent();
+    };
+    
+    const handlePreserveState = () => {
+      // This event is triggered when navigating to this page from the 
+      // GlobalTimerStatus component, so we don't need to do anything
+      // as the state is already preserved in localStorage
+      console.log('[PomodoroTimer] Preserving timer state during navigation');
+      
+      // Set a flag in sessionStorage to indicate we're navigating back
+      // This will prevent the timer from resetting when the component mounts
+      sessionStorage.setItem('pomodoro-navigating-back', 'true');
+    };
+    
+    // Add event listeners
+    window.addEventListener('pomodoro-toggle-timer', handleToggleTimer);
+    window.addEventListener('pomodoro-stop-timer', handleStopTimer);
+    window.addEventListener('pomodoro-preserve-state', handlePreserveState);
+    
+    return () => {
+      window.removeEventListener('pomodoro-toggle-timer', handleToggleTimer);
+      window.removeEventListener('pomodoro-stop-timer', handleStopTimer);
+      window.removeEventListener('pomodoro-preserve-state', handlePreserveState);
+    };
+  }, [isActive, timeRemaining]);
+
+  // Set up beforeunload event handler
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveTimerState();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Add a useEffect to handle authentication changes and logout
+  useEffect(() => {
+    const handleLogout = () => {
+      console.log('[PomodoroTimer] Detected logout event, cleaning up timer');
+      
+      // Stop any running timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+      // Reset the timer UI state
+      setIsActive(false);
+      endTimeRef.current = null;
+      
+      // Clear any timer-related localStorage items (backup cleanup)
+      localStorage.removeItem(TIMER_ACTIVE_KEY);
+      localStorage.removeItem(TIMER_END_TIME_KEY);
+      localStorage.removeItem(TIMER_MODE_KEY);
+      localStorage.removeItem(TIMER_STATE_KEY);
+      localStorage.removeItem(TIMER_PAUSED_KEY);
+      localStorage.removeItem(TIMER_REMAINING_KEY);
+    };
+    
+    // Listen for auth changes through a custom event
+    window.addEventListener('pomodoro-stop-timer', handleLogout);
+    
+    return () => {
+      window.removeEventListener('pomodoro-stop-timer', handleLogout);
     };
   }, []);
 

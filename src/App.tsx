@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import { lazy, Suspense } from "react";
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { GlobalTimerStatus } from "@/components/pomodoro/GlobalTimerStatus";
 
 // Loader component
 const PageLoader = () => (
@@ -60,6 +61,9 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            
+            {/* Global timer status indicator */}
+            <GlobalTimerStatus />
           </AuthProvider>
         </BrowserRouter>
         

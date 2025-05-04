@@ -523,6 +523,82 @@ const FinanceContent = () => {
     fetchAll();
   }, [fetchAll, user]);
   
+  // Add a useEffect for real-time updates with Supabase subscription
+  useEffect(() => {
+    if (!user) return;
+    
+    // Set up real-time subscription for transactions
+    const transactionSubscription = supabase
+      .channel('finance-transactions')
+      .on('postgres_changes', {
+        event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+        schema: 'public',
+        table: 'transactions',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('Transaction change detected:', payload);
+        
+        // Immediately update local data based on the change type
+        if (payload.eventType === 'INSERT') {
+          // Fetch the new transaction with its category
+          supabase
+            .from('transactions')
+            .select('*, transaction_categories(name, type, icon, color)')
+            .eq('id', payload.new.id)
+            .single()
+            .then(({ data, error }) => {
+              if (!error && data) {
+                setTransactions(prev => [data, ...prev]);
+              }
+            });
+        } else if (payload.eventType === 'UPDATE') {
+          // Update the existing transaction in the state
+          setTransactions(prev => prev.map(t => 
+            t.id === payload.new.id ? { ...t, ...payload.new } : t
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          // Remove the deleted transaction from state
+          setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
+        }
+        
+        // Also force refresh data to ensure complete sync
+        dataCache.current.lastFetchTime = 0;
+        fetchAll(true);
+      })
+      .subscribe();
+    
+    // Clean up subscription on unmount
+    return () => {
+      transactionSubscription.unsubscribe();
+    };
+  }, [user, fetchAll]);
+
+  // Also add similar subscription for accounts
+  useEffect(() => {
+    if (!user) return;
+    
+    // Set up real-time subscription for accounts
+    const accountSubscription = supabase
+      .channel('finance-accounts')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'financial_accounts',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('Account change detected:', payload);
+        // Force refresh data when an account changes
+        dataCache.current.lastFetchTime = 0;
+        fetchAll(true);
+      })
+      .subscribe();
+    
+    // Clean up subscription on unmount
+    return () => {
+      accountSubscription.unsubscribe();
+    };
+  }, [user, fetchAll]);
+
   // Handle account creation
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1462,6 +1538,8 @@ const FinanceContent = () => {
                 <TransactionForm 
                   accountId={selectedAccountId || ''} 
                   onSuccess={() => {
+                    // Force immediate refresh by setting cache timestamp to 0
+                    dataCache.current.lastFetchTime = 0;
                     fetchAll(true);
                     closeTransactionDialog();
                   }}

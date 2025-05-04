@@ -24,7 +24,16 @@ import {
   Target, 
   Trash2,
   MoreVertical,
-  Edit
+  Edit,
+  Activity,
+  ShoppingBag,
+  BookOpen,
+  Plane,
+  Utensils,
+  FolderKanban,
+  Repeat,
+  CalendarClock,
+  CheckSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -42,7 +51,7 @@ interface CategoryWithIcon {
   color: string;
 }
 
-// Same pre-defined categories with icons as in TaskForm
+// Expand the categoriesWithIcons list with more options for better UX
 const categoriesWithIcons: CategoryWithIcon[] = [
   { name: 'Work', icon: <Briefcase className="h-4 w-4" />, color: "text-blue-600" },
   { name: 'Personal', icon: <Home className="h-4 w-4" />, color: "text-purple-600" },
@@ -50,8 +59,42 @@ const categoriesWithIcons: CategoryWithIcon[] = [
   { name: 'Health', icon: <Heart className="h-4 w-4" />, color: "text-rose-600" },
   { name: 'Finance', icon: <DollarSign className="h-4 w-4" />, color: "text-emerald-600" },
   { name: 'Education', icon: <GraduationCap className="h-4 w-4" />, color: "text-amber-600" },
+  { name: 'Fitness', icon: <Activity className="h-4 w-4" />, color: "text-red-600" },
+  { name: 'Shopping', icon: <ShoppingBag className="h-4 w-4" />, color: "text-pink-600" },
+  { name: 'Reading', icon: <BookOpen className="h-4 w-4" />, color: "text-indigo-600" },
+  { name: 'Travel', icon: <Plane className="h-4 w-4" />, color: "text-cyan-600" },
+  { name: 'Food', icon: <Utensils className="h-4 w-4" />, color: "text-orange-600" },
+  { name: 'Project', icon: <FolderKanban className="h-4 w-4" />, color: "text-violet-600" },
   { name: 'Other', icon: <Tag className="h-4 w-4" />, color: "text-gray-600" },
 ];
+
+// Add task type icons for better visualization
+const getTaskTypeIcon = (type: TaskType) => {
+  switch (type) {
+    case 'habit':
+      return {
+        icon: <Repeat className="h-4 w-4" />,
+        color: "text-purple-600",
+        bgColor: "bg-purple-100",
+        label: "Habit"
+      };
+    case 'recurring':
+      return {
+        icon: <CalendarClock className="h-4 w-4" />,
+        color: "text-blue-600",
+        bgColor: "bg-blue-100",
+        label: "Recurring"
+      };
+    case 'task':
+    default:
+      return {
+        icon: <CheckSquare className="h-4 w-4" />,
+        color: "text-green-600",
+        bgColor: "bg-green-100",
+        label: "Task"
+      };
+  }
+};
 
 // Helper function to get category icon and color
 const getCategoryIcon = (categoryName: string) => {
@@ -130,6 +173,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
   // Get the category icon and color
   const { icon: categoryIcon, color: categoryColor } = getCategoryIcon(task.category || '');
   
+  // Get task type info
+  const taskTypeInfo = getTaskTypeIcon(task.type);
+  
   // Calculate days left if due date exists
   const getDaysLeft = () => {
     if (!task.due_date) return null;
@@ -148,10 +194,35 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   const daysLeft = getDaysLeft();
 
+  // Determine border color based on task status and type
+  const getBorderColor = () => {
+    if (task.completed) return "border-l-green-500";
+    if (isOverdue) return "border-l-red-500";
+    
+    switch (task.type) {
+      case 'habit': return "border-l-purple-500";
+      case 'recurring': return "border-l-blue-500";
+      default: return "border-l-primary";
+    }
+  };
+
+  // Determine background shade based on task status
+  const getBackgroundColor = () => {
+    if (task.completed) return "bg-green-50/30";
+    if (isOverdue) return "bg-red-50/20";
+    
+    switch (task.type) {
+      case 'habit': return "hover:bg-purple-50/20";
+      case 'recurring': return "hover:bg-blue-50/20";
+      default: return "hover:bg-primary-50/20";
+    }
+  };
+
   return (
     <Card className={cn(
       "relative overflow-hidden transition-all duration-300 group hover:shadow-md border-l-4",
-      task.completed ? "border-l-green-500 bg-green-50/30" : isOverdue ? "border-l-red-500" : "border-l-primary"
+      getBorderColor(),
+      getBackgroundColor()
     )}>
       <div className={cn(
         "absolute inset-0 opacity-0 transition-opacity",
@@ -162,9 +233,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
         {/* Header with checkbox and type/status indicators */}
         <div className="flex items-start gap-3">
           <div className="shrink-0 mt-0.5">
-          <Checkbox 
-            checked={task.completed}
-            onCheckedChange={(checked) => onComplete(task.id, checked as boolean)}
+            <Checkbox 
+              checked={task.completed}
+              onCheckedChange={(checked) => onComplete(task.id, checked as boolean)}
               className={cn(
                 "h-5 w-5 rounded-full transition-all", 
                 task.completed ? "bg-green-500 text-white" : "",
@@ -180,10 +251,23 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 task.completed ? "text-muted-foreground line-through" : "text-foreground",
                 isOverdue && !task.completed ? "text-red-700" : ""
               )}>
-                  {task.title}
+                {task.title}
               </h3>
               
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Task type badge */}
+                <Badge 
+                  variant="secondary"
+                  className={cn(
+                    "text-xs py-0 h-5 gap-1 font-normal",
+                    taskTypeInfo.bgColor,
+                    taskTypeInfo.color
+                  )}
+                >
+                  <span className="flex-shrink-0">{taskTypeInfo.icon}</span>
+                  <span className="truncate max-w-[60px] hidden sm:inline">{taskTypeInfo.label}</span>
+                </Badge>
+                
                 {/* Category badge with icon */}
                 {task.category && (
                   <Badge 
@@ -194,62 +278,43 @@ const TaskCard: React.FC<TaskCardProps> = ({
                     )}
                   >
                     <span className="flex-shrink-0">{categoryIcon}</span>
-                    <span className="truncate max-w-[80px]">{task.category}</span>
+                    <span className="truncate max-w-[60px] hidden sm:inline">{task.category}</span>
                   </Badge>
                 )}
                 
-                {/* Type badge */}
-                <Badge 
-                  variant="secondary" 
-                  className="text-xs py-0 h-5 font-normal"
-                >
-                  {task.type === 'habit' ? (
-                    <span className="flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" />
-                      <span>Habit</span>
-                    </span>
-                  ) : task.type === 'recurring' ? (
-                    <span className="flex items-center gap-1">
-                      <Circle className="h-3 w-3" />
-                      <span>Recurring</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      <span>Task</span>
-                </span>
-                  )}
-                </Badge>
-                
-                {/* Actions menu */}
-                {(onDelete || onEdit) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {onEdit && (
-                        <DropdownMenuItem 
-                          onClick={() => onEdit(task)}
-                        >
-                          <Edit className="h-3.5 w-3.5 mr-2" />
-                          Edit Task
-                        </DropdownMenuItem>
-                      )}
-                      {onDelete && (
-                        <DropdownMenuItem 
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => onDelete(task.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Delete Task
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                {/* Dropdown menu for actions */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 rounded-full hover:bg-muted"
+                    >
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-36">
+                    {onEdit && (
+                      <DropdownMenuItem onClick={() => onEdit(task)} className="cursor-pointer">
+                        <Edit className="mr-2 h-4 w-4" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                    )}
+                    {onDelete && (
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this task?')) {
+                            onDelete(task.id);
+                          }
+                        }} 
+                        className="cursor-pointer text-red-600 focus:text-red-700"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             

@@ -82,8 +82,9 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
   const [isEditCardOpen, setIsEditCardOpen] = useState(false);
   const [isDeleteCardOpen, setIsDeleteCardOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState('');
-  const [addCardColumnId, setAddCardColumnId] = useState<string | null>(null);
+  const [addCardColumnId, setAddCardColumnId] = useState('');
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDescription, setNewCardDescription] = useState('');
   const [newCardTags, setNewCardTags] = useState('');
@@ -208,6 +209,7 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
   // Add Column
   const handleAddColumn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!newColumnTitle.trim()) {
       setIsColumnTitleError(true);
       setTimeout(() => setIsColumnTitleError(false), 600);
@@ -216,8 +218,31 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
     
     if (!user) return;
     
+    // Disable the form while submitting
+    setIsSubmitting(true);
+    
     try {
-      const maxPosition = columns.length > 0 ? Math.max(...columns.map(c => c.position)) : 0;
+      // Check if a column with the same title already exists to prevent duplicates
+      const existingColumn = columns.find(
+        col => col.title.toLowerCase() === newColumnTitle.trim().toLowerCase()
+      );
+      
+      if (existingColumn) {
+        toast({
+          title: 'Column already exists',
+          description: 'A column with this name already exists on this board.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      console.log(`Adding new column: ${newColumnTitle}`);
+      
+      // Calculate next position based on existing columns
+      const maxPosition = columns.length > 0 
+        ? Math.max(...columns.map(c => c.position)) 
+        : 0;
+      
       const { error } = await supabase
         .from('kanban_columns')
         .insert({
@@ -225,17 +250,30 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
           board_id: boardId,
           position: maxPosition + 1000,
         });
+        
       if (error) throw error;
+      
+      // Reset form state
       setNewColumnTitle('');
       setIsAddColumnOpen(false);
+      
+      // Refresh board data
       fetchBoardData();
-      toast({ title: 'Column added' });
+      
+      // Provide user feedback
+      toast({ 
+        title: 'Column added',
+        description: 'New column added successfully!'
+      });
     } catch (error) {
+      console.error('Error adding column:', error);
       toast({
         title: 'Error',
         description: 'Failed to add column',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -250,9 +288,33 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
     
     if (!addCardColumnId || !user) return;
     
+    // Disable the form while submitting
+    setIsSubmitting(true);
+    
     try {
+      // Check if a card with the same title already exists in this column
+      const existingCard = cards.find(
+        card => card.column_id === addCardColumnId && 
+        card.title.toLowerCase() === newCardTitle.trim().toLowerCase()
+      );
+      
+      if (existingCard) {
+        toast({
+          title: 'Card already exists',
+          description: 'A card with this name already exists in this column.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      console.log(`Adding new card: ${newCardTitle} to column: ${addCardColumnId}`);
+      
+      // Calculate next position based on existing cards in the column
       const columnCards = cards.filter(c => c.column_id === addCardColumnId);
-      const maxPosition = columnCards.length > 0 ? Math.max(...columnCards.map(c => c.position)) : 0;
+      const maxPosition = columnCards.length > 0 
+        ? Math.max(...columnCards.map(c => c.position)) 
+        : 0;
+      
       const tagsArr = newCardTags.split(',').map(t => t.trim()).filter(Boolean);
       
       const { error } = await supabase
@@ -288,6 +350,8 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
         description: 'Failed to add card',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -730,7 +794,7 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
       setDraggedCard(null);
       setActiveColumn(null);
       setCurrentCard(null);
-      setAddCardColumnId(null);
+      setAddCardColumnId('');
       setNewCardTitle('');
       setNewCardDescription('');
       setNewCardTags('');
@@ -1158,7 +1222,7 @@ const KanbanBoard = ({ boardId, boardColor = '#7c3aed', viewMode = 'comfortable'
         onOpenChange={(open) => {
           if (!open) {
             // When closing, reset form state and force cleanup
-            setAddCardColumnId(null);
+            setAddCardColumnId('');
             setNewCardTitle('');
             setNewCardDescription('');
             setNewCardTags('');

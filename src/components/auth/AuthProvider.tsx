@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 // Constants
 const AUTH_STORAGE_KEY = 'supabase_auth_state';
 const DEVELOPMENT_MODE = false; // Disable development mode to use real data
-const AUTH_STATE_VERSION = 'v1'; // Used to invalidate stored auth state when format changes
+const AUTH_STATE_VERSION = 'v2'; // Used to invalidate stored auth state when format changes
 
 interface AuthContextType {
   session: Session | null;
@@ -52,12 +52,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     
     const initAuth = async () => {
       try {
-    // Try to get session from localStorage first for faster initial render
+        // Try to get session from localStorage first for faster initial render
         const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
         let initialStateLoaded = false;
         
         if (storedData) {
-      try {
+          try {
             const { version, data } = JSON.parse(storedData);
             
             // Only use cached data if version matches
@@ -65,18 +65,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               setUser(data.user);
               setSession(data);
               initialStateLoaded = true;
+              console.log("[AuthProvider] Using cached auth session");
             } else {
               // Clear outdated data
               localStorage.removeItem(AUTH_STORAGE_KEY);
+              console.log("[AuthProvider] Cleared outdated cached session");
+            }
+          } catch (e) {
+            console.error('Failed to parse stored session:', e);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
         }
-      } catch (e) {
-        console.error('Failed to parse stored session:', e);
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-      }
-    }
 
+        // Get current session state from API
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+        
         // Setup auth change subscription
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, currentSession) => {
             if (!mounted) return;
             
@@ -85,7 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             // Accept any valid session regardless of email verification
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
               if (currentSession) {
-          setSession(currentSession);
+                setSession(currentSession);
                 setUser(currentSession.user ?? null);
                 
                 // Store with version to allow future format changes
@@ -99,15 +108,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 
                 setLoading(false);
                 setIsInitialized(true);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+              }
+            } else if (event === 'SIGNED_OUT') {
+              setSession(null);
+              setUser(null);
+              localStorage.removeItem(AUTH_STORAGE_KEY);
               // Only redirect to auth if we're not already there
               if (location.pathname !== '/auth') {
                 navigate('/auth', { replace: true });
-        }
+              }
               setLoading(false);
               setIsInitialized(true);
             } else if (event === 'INITIAL_SESSION') {
@@ -123,35 +132,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                   })
                 );
               }
-        setLoading(false);
-        setIsInitialized(true);
+              setLoading(false);
+              setIsInitialized(true);
             }
-      }
-    );
+          }
+        );
 
-        // If we didn't load from cache, get session from API
-        if (!initialStateLoaded) {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-          
-          if (!mounted) return;
-        
-        if (error) {
-          throw error;
-        }
+        // If we didn't load from cache or if there's a current API session, use that
+        const currentSession = sessionData?.session;
         
         if (currentSession) {
+          console.log("[AuthProvider] Got live session from API");
           setSession(currentSession);
           setUser(currentSession.user);
-            localStorage.setItem(
-              AUTH_STORAGE_KEY, 
-              JSON.stringify({
-                version: AUTH_STATE_VERSION,
-                data: currentSession
-              })
-            );
-          } else if (requireAuth && !DEVELOPMENT_MODE && location.pathname !== '/auth') {
+          localStorage.setItem(
+            AUTH_STORAGE_KEY, 
+            JSON.stringify({
+              version: AUTH_STATE_VERSION,
+              data: currentSession
+            })
+          );
+        } else if (!initialStateLoaded) {
+          // No current session - if we require auth and not in dev mode, redirect
+          if (requireAuth && !DEVELOPMENT_MODE && location.pathname !== '/auth') {
             navigate('/auth', { replace: true });
-        }
+          }
         }
         
         // Set loading to false even if there's no session
@@ -165,13 +170,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
-        toast({
-          title: 'Authentication Error',
-          description: 'There was a problem with your authentication session',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        setIsInitialized(true);
+          toast({
+            title: 'Authentication Error',
+            description: 'There was a problem with your authentication session',
+            variant: 'destructive'
+          });
+          setLoading(false);
+          setIsInitialized(true);
         }
         // Return empty function for cleanup when there's an error
         return () => {};
@@ -193,6 +198,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const signOut = async () => {
     try {
       setLoading(true);
+      
+      // Clear all timer-related localStorage items
+      localStorage.removeItem('pomodoro-is-active');
+      localStorage.removeItem('pomodoro-end-time');
+      localStorage.removeItem('pomodoro-mode');
+      localStorage.removeItem('pomodoro-timer-state');
+      localStorage.removeItem('pomodoro-is-paused');
+      localStorage.removeItem('pomodoro-time-remaining');
+      
+      // Clear any session storage flags
+      sessionStorage.removeItem('pomodoro-navigating-back');
+      sessionStorage.removeItem('pomodoro-navigation-timestamp');
+      
+      // Fire a timer stop event
+      const stopEvent = new CustomEvent('pomodoro-stop-timer');
+      window.dispatchEvent(stopEvent);
+      
+      // Now sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -223,31 +246,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     devMode: DEVELOPMENT_MODE,
     isInitialized
   };
-
-  // Using a simpler loading indicator that doesn't take over the whole UI
-  // This prevents "stuck" loading states when switching routes
-  if (loading && !isInitialized) {
-    return (
-      <div className="flex items-center justify-center fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-muted-foreground">Loading session...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // In development mode, bypass the requireAuth check
-  if (requireAuth && !user && !DEVELOPMENT_MODE && isInitialized) {
-    if (location.pathname !== '/auth') {
-      navigate('/auth', { replace: true });
-    }
-    return null;
-  }
-
+  
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export default AuthContext;

@@ -312,35 +312,46 @@ const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onD
 
         if (error) throw error;
         
+        // Call onSuccess immediately to ensure parent components refresh data
+        // This should trigger the data refresh in the parent component
+        onSuccess();
+        
         toast({
           title: 'Success',
           description: 'Transaction updated successfully'
         });
+        
+        resetForm();
       } else {
         // Create new transaction
-      const { error } = await supabase
-        .from('transactions')
-        .insert({
-          account_id: accountId,
-          amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
-          type,
-          category_id: categoryId,
-          note: note.trim() || null,
-          date: date.toISOString(),
-          tags: tagsArray,
-          user_id: user?.id || 'dev-user'
-        });
+        const { error, data } = await supabase
+          .from('transactions')
+          .insert({
+            account_id: accountId,
+            amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
+            type,
+            category_id: categoryId,
+            note: note.trim() || null,
+            date: date.toISOString(),
+            tags: tagsArray,
+            user_id: user?.id || 'dev-user'
+          })
+          .select('id')
+          .single();
 
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Transaction added successfully'
-      });
+        if (error) throw error;
+        
+        // Call onSuccess immediately to ensure parent components refresh data
+        // This should trigger the data refresh in the parent component
+        onSuccess();
+        
+        toast({
+          title: 'Success',
+          description: 'Transaction added successfully'
+        });
+        
+        resetForm();
       }
-      
-      resetForm();
-      onSuccess();
     } catch (error) {
       console.error('Error with transaction:', error);
       
