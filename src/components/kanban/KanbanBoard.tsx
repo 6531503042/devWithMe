@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, MoreVertical, Edit, Trash2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface KanbanCard {
   id: string;
@@ -36,14 +43,18 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+  const [isEditCardOpen, setIsEditCardOpen] = useState(false);
+  const [isDeleteCardOpen, setIsDeleteCardOpen] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [addCardColumnId, setAddCardColumnId] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDescription, setNewCardDescription] = useState('');
   const [newCardTags, setNewCardTags] = useState('');
+  const [currentCard, setCurrentCard] = useState<KanbanCard | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   // Drag and drop state
   const [draggedCard, setDraggedCard] = useState<KanbanCard | null>(null);
@@ -143,6 +154,69 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
         variant: 'destructive',
       });
     }
+  };
+
+  // Edit Card
+  const handleEditCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentCard || !newCardTitle.trim() || !user) return;
+    try {
+      const tagsArr = newCardTags.split(',').map(t => t.trim()).filter(Boolean);
+      const { error } = await supabase
+        .from('kanban_cards')
+        .update({
+          title: newCardTitle.trim(),
+          description: newCardDescription.trim() || null,
+          tags: tagsArr.length > 0 ? tagsArr : null,
+        })
+        .eq('id', currentCard.id);
+      if (error) throw error;
+      setIsEditCardOpen(false);
+      fetchBoardData();
+      toast({ title: 'Card updated' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update card',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Delete Card
+  const handleDeleteCard = async () => {
+    if (!currentCard || !user) return;
+    try {
+      const { error } = await supabase
+        .from('kanban_cards')
+        .delete()
+        .eq('id', currentCard.id);
+      if (error) throw error;
+      setIsDeleteCardOpen(false);
+      fetchBoardData();
+      toast({ title: 'Card deleted' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete card',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Open edit card dialog
+  const openEditCardDialog = (card: KanbanCard) => {
+    setCurrentCard(card);
+    setNewCardTitle(card.title);
+    setNewCardDescription(card.description || '');
+    setNewCardTags(card.tags ? card.tags.join(', ') : '');
+    setIsEditCardOpen(true);
+  };
+
+  // Open delete card dialog
+  const openDeleteCardDialog = (card: KanbanCard) => {
+    setCurrentCard(card);
+    setIsDeleteCardOpen(true);
   };
 
   const moveCard = async (cardId: string, targetColumnId: string, newPosition: number) => {
@@ -345,12 +419,13 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
         <KanbanSkeleton />
       ) : (
         <>
-          <div className="flex flex-no-wrap overflow-x-auto pb-4 gap-4">
+          <div className="flex flex-no-wrap overflow-x-auto pb-6 gap-4 touch-pan-x">
             {columns.map(column => (
               <div
                 key={column.id}
+                id={`column-${column.id}`}
                 data-column-id={column.id}
-                className={`kanban-column flex-shrink-0 w-80 bg-secondary/30 rounded-lg p-4 border-2 border-transparent transition-colors ${
+                className={`kanban-column flex-shrink-0 w-72 sm:w-80 bg-secondary/30 rounded-lg p-4 border-2 border-transparent transition-colors ${
                   activeColumn === column.id ? 'bg-primary/10 border-primary' : ''
                 }`}
                 onDragOver={(e) => handleDragOver(e, column.id)}
@@ -381,12 +456,13 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                     .map(card => (
                       <Card
                         key={card.id}
-                        className="relative cursor-move"
+                        id={`card-${card.id}`}
+                        className="relative cursor-move group"
                         draggable
                         onDragStart={(e) => handleDragStart(e, card)}
                         onDragEnd={handleDragEnd}
                       >
-                        <CardContent className="p-3">
+                        <CardContent className="p-3 pr-8">
                           <h4 className="font-medium mb-1">{card.title}</h4>
                           {card.description && (
                             <p className="text-sm text-muted-foreground mb-2">{card.description}</p>
@@ -403,6 +479,31 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                               ))}
                             </div>
                           )}
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditCardDialog(card)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => openDeleteCardDialog(card)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </CardContent>
                       </Card>
                     ))}
@@ -421,7 +522,7 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
               </div>
             ))}
             
-            <div className="flex-shrink-0 w-80">
+            <div className="flex-shrink-0 w-72 sm:w-80">
               {isAddColumnOpen ? (
                 <Card className="p-4">
                   <form onSubmit={handleAddColumn}>
@@ -509,6 +610,87 @@ const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
               <Button type="submit">Add Card</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Card Dialog */}
+      <Dialog open={isEditCardOpen} onOpenChange={setIsEditCardOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Card</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditCard} className="space-y-4 mt-2">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-card-title">Title</Label>
+              <Input
+                id="edit-card-title"
+                value={newCardTitle}
+                onChange={(e) => setNewCardTitle(e.target.value)}
+                placeholder="Card title"
+                required
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="edit-card-description">Description (optional)</Label>
+              <Textarea
+                id="edit-card-description"
+                value={newCardDescription}
+                onChange={(e) => setNewCardDescription(e.target.value)}
+                placeholder="Card description"
+                rows={3}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="edit-card-tags">Tags (comma separated, optional)</Label>
+              <Input
+                id="edit-card-tags"
+                value={newCardTags}
+                onChange={(e) => setNewCardTags(e.target.value)}
+                placeholder="frontend, bug, urgent"
+              />
+            </div>
+            
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditCardOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Card</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Card Confirmation Dialog */}
+      <Dialog open={isDeleteCardOpen} onOpenChange={setIsDeleteCardOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Card</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this card? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="p-4 border rounded-md bg-muted/50 mt-2">
+            <p className="font-medium">{currentCard?.title}</p>
+            {currentCard?.description && (
+              <p className="text-sm text-muted-foreground mt-1">{currentCard.description}</p>
+            )}
+          </div>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setIsDeleteCardOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              variant="destructive" 
+              onClick={handleDeleteCard}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

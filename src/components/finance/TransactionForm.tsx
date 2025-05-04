@@ -33,7 +33,8 @@ import {
   Tag,
   Plus,
   ArrowDownCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Trash2
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -46,8 +47,11 @@ import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
 import { useTransactionCategories } from '@/hooks/use-cached-data';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type TransactionCategory = Database['public']['Tables']['transaction_categories']['Row'];
+type Transaction = Database['public']['Tables']['transactions']['Row'];
 
 // Define built-in category icons for the transaction form
 interface CategoryIcon {
@@ -94,9 +98,21 @@ const getCategoryIcon = (categoryName: string, type: 'income' | 'expense'): Cate
   return matchedIcon || defaultIcon;
 };
 
+// Format currency
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('th-TH', {
+    style: 'currency',
+    currency: 'THB',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
 interface TransactionFormProps {
   accountId: string;
   onSuccess: () => void;
+  existingTransaction?: Transaction | null;
+  onDelete?: (id: string) => void;
 }
 
 // Add a constant for the localStorage key
@@ -146,9 +162,21 @@ const createCategoryIfNeeded = async (catName: string, type: 'income' | 'expense
   }
 };
 
-const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
-  // Load initial form state from localStorage if available
+const TransactionForm = ({ accountId, onSuccess, existingTransaction = null, onDelete }: TransactionFormProps) => {
+  // Load initial form state from localStorage if available or from existing transaction
   const loadSavedState = () => {
+    if (existingTransaction) {
+      return {
+        currentStep: 1,
+        amount: Math.abs(existingTransaction.amount).toString(),
+        type: existingTransaction.type,
+        categoryId: existingTransaction.category_id,
+        note: existingTransaction.note || '',
+        date: new Date(existingTransaction.date),
+        tags: existingTransaction.tags ? existingTransaction.tags.join(', ') : '',
+      };
+    }
+    
     try {
       const savedState = localStorage.getItem(FORM_STATE_KEY);
       if (savedState) {
@@ -182,9 +210,11 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
   const [amountError, setAmountError] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [showCategorySuccess, setShowCategorySuccess] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const { user, devMode } = useAuth();
   const { toast } = useToast();
   const [loadingCategory, setLoadingCategory] = useState('');
+  const isMobile = useIsMobile();
 
   // Use our new hook to fetch categories based on the current type
   const { data: categories = [], refetch: refetchCategories } = useTransactionCategories(type);
@@ -266,34 +296,89 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
     const tagsArray = tags.trim() ? tags.split(',').map(tag => tag.trim()) : null;
     
     try {
+      if (existingTransaction) {
+        // Update existing transaction
+        const { error } = await supabase
+          .from('transactions')
+          .update({
+            amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
+            type,
+            category_id: categoryId,
+            note: note.trim() || null,
+            date: date.toISOString(),
+            tags: tagsArray,
+          })
+          .eq('id', existingTransaction.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: 'Success',
+          description: 'Transaction updated successfully'
+        });
+      } else {
+        // Create new transaction
+        const { error } = await supabase
+          .from('transactions')
+          .insert({
+            account_id: accountId,
+            amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
+            type,
+            category_id: categoryId,
+            note: note.trim() || null,
+            date: date.toISOString(),
+            tags: tagsArray,
+            user_id: user?.id || 'dev-user'
+          });
+
+        if (error) throw error;
+        
+        toast({
+          title: 'Success',
+          description: 'Transaction added successfully'
+        });
+      }
+      
+      resetForm();
+      onSuccess();
+    } catch (error) {
+      console.error('Error with transaction:', error);
+      
+      toast({
+        title: 'Error',
+        description: existingTransaction ? 'Failed to update transaction' : 'Failed to add transaction',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!existingTransaction || !onDelete) return;
+    
+    setIsSubmitting(true);
+    try {
       const { error } = await supabase
         .from('transactions')
-        .insert({
-          account_id: accountId,
-          amount: type === 'expense' ? -parseFloat(amount) : parseFloat(amount),
-          type,
-          category_id: categoryId,
-          note: note.trim() || null,
-          date: date.toISOString(),
-          tags: tagsArray,
-          user_id: user?.id || 'dev-user'
-        });
+        .delete()
+        .eq('id', existingTransaction.id);
 
       if (error) throw error;
       
       toast({
         title: 'Success',
-        description: 'Transaction added successfully'
+        description: 'Transaction deleted successfully'
       });
       
-      resetForm();
-      onSuccess();
+      onDelete(existingTransaction.id);
+      setIsDeleteConfirmOpen(false);
     } catch (error) {
-      console.error('Error adding transaction:', error);
+      console.error('Error deleting transaction:', error);
       
       toast({
         title: 'Error',
-        description: 'Failed to add transaction',
+        description: 'Failed to delete transaction',
         variant: 'destructive'
       });
     } finally {
@@ -335,16 +420,6 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
     setCurrentStep(Math.max(currentStep - 1, 1));
   };
   
-  const getStepTitle = () => {
-    switch (currentStep) {
-      case 1: return "Amount & Type";
-      case 2: return "Category";
-      case 3: return "Details";
-      default: return "Add Transaction";
-    }
-  };
-  
-  // Jump directly to step if clicked
   const goToStep = (step: number) => {
     // Validate current step before allowing jump
     if (currentStep === 1 && step > 1) {
@@ -373,7 +448,7 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
         type === 'expense' ? 'bg-gradient-to-b from-red-500/10 to-transparent' : 'bg-gradient-to-b from-green-500/10 to-transparent'
       )}>
         <CardTitle className="text-xl flex items-center justify-between">
-          <span>Add Transaction</span>
+          <span>{existingTransaction ? 'Edit Transaction' : 'Add Transaction'}</span>
           <span className={cn(
             "text-sm font-normal px-2 py-1 rounded-full",
             type === 'expense' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
@@ -397,7 +472,7 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                   tabIndex={0}
                 >
                   <div 
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 cursor-pointer transition-all ${
+                    className={`flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-full border-2 cursor-pointer transition-all ${
                       currentStep >= step 
                         ? type === 'expense'
                           ? 'bg-red-500 text-white border-red-500 shadow-md' 
@@ -406,12 +481,12 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                     }`}
                   >
                     {currentStep > step ? (
-                      <CheckCircle2 className="h-5 w-5" />
+                      <CheckCircle2 className="h-4 w-4" />
                     ) : (
                       <span className="font-medium">{step}</span>
                     )}
                   </div>
-                  <span className="text-xs mt-1 text-muted-foreground font-medium">
+                  <span className="text-xs mt-1 text-muted-foreground font-medium truncate max-w-[60px] text-center">
                     {step === 1 ? 'Amount' : step === 2 ? 'Category' : 'Details'}
                   </span>
                 </div>
@@ -429,64 +504,64 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
             {currentStep === 1 && (
               <div className="space-y-4">
                 {/* Type selection */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button 
-                type="button"
-                variant={type === 'expense' ? 'default' : 'outline'} 
-                className={cn(
-                      "w-full justify-center text-base font-normal h-12",
-                  type === 'expense' && "bg-red-500 hover:bg-red-600 text-white"
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    type="button"
+                    variant={type === 'expense' ? 'default' : 'outline'} 
+                    className={cn(
+                      "w-full justify-center text-base font-normal h-10 sm:h-12",
+                      type === 'expense' && "bg-red-500 hover:bg-red-600 text-white"
+                    )}
                     onClick={() => {
                       setType('expense');
                       // We clear categoryId since categories are type-specific
                       setCategoryId('');
                     }}
                   >
-                    <ArrowUpCircle className="h-5 w-5 mr-2" />
-                Expense
-              </Button>
-              <Button 
-                type="button"
-                variant={type === 'income' ? 'default' : 'outline'} 
-                className={cn(
-                      "w-full justify-center text-base font-normal h-12",
-                  type === 'income' && "bg-green-500 hover:bg-green-600 text-white"
-                )}
+                    <ArrowUpCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                    <span className="whitespace-nowrap">Expense</span>
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant={type === 'income' ? 'default' : 'outline'} 
+                    className={cn(
+                      "w-full justify-center text-base font-normal h-10 sm:h-12",
+                      type === 'income' && "bg-green-500 hover:bg-green-600 text-white"
+                    )}
                     onClick={() => {
                       setType('income');
                       // We clear categoryId since categories are type-specific
                       setCategoryId('');
                     }}
                   >
-                    <ArrowDownCircle className="h-5 w-5 mr-2" />
-                Income
-              </Button>
-            </div>
+                    <ArrowDownCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                    <span className="whitespace-nowrap">Income</span>
+                  </Button>
+                </div>
 
-            {/* Amount */}
+                {/* Amount */}
                 <div className="grid gap-2 mt-4">
                   <Label htmlFor="amount" className="text-base font-medium">Amount</Label>
-              <div className="relative">
+                  <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0.00"
+                    <Input
+                      id="amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0.00"
                       className={cn(
-                        "pl-10 text-xl h-14 font-medium", 
+                        "pl-10 text-lg sm:text-xl h-12 sm:h-14 font-medium", 
                         amountError ? "border-red-500 focus-visible:ring-red-500" : ""
                       )}
-                  value={amount}
+                      value={amount}
                       onChange={(e) => {
                         setAmount(e.target.value);
                         if (amountError) validateAmount();
                       }}
                       onBlur={validateAmount}
-                  required
-                />
+                      required
+                    />
                   </div>
                   {amountError && (
                     <p className="text-red-500 text-sm mt-1">{amountError}</p>
@@ -501,7 +576,7 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="category" className="text-base font-medium">Select a category</Label>
                   {categoryId && (
-                    <Badge variant="outline" className={cn(
+                    <Badge variant="secondary" className={cn(
                       "px-2 py-1",
                       type === 'expense' ? "bg-red-100 text-red-800 border-red-200" : 
                       "bg-green-100 text-green-800 border-green-200"
@@ -518,11 +593,11 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                 )}
                 
                 <div className={cn(
-                  "bg-secondary/40 rounded-lg p-4 border-2",
+                  "bg-secondary/40 rounded-lg p-3 sm:p-4 border-2",
                   categoryId ? (type === 'expense' ? "border-red-200" : "border-green-200") : "border-dashed border-muted-foreground/30"
                 )}>
                   <p className="text-sm font-medium mb-3">{type === 'expense' ? 'Expense' : 'Income'} categories:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                     {categoryIcons.filter(cat => cat.type === type).map((cat) => {
                       // Case-insensitive matching of category names with better comparison logic
                       const foundCat = categories.find(c => 
@@ -612,69 +687,69 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                   <div className="flex items-center gap-2 mt-3 text-sm text-green-600 animate-fade-in">
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Category selected! Click Next to continue.</span>
-                        </div>
-                  )}
-            </div>
+                  </div>
+                )}
+              </div>
             )}
             
             {/* Step 3: Details */}
             {currentStep === 3 && (
               <div className="space-y-4">
-            {/* Date */}
-            <div className="grid gap-2">
+                {/* Date */}
+                <div className="grid gap-2">
                   <Label htmlFor="date" className="text-base font-medium">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
                         variant={"outline"}
                         className={cn(
                           "w-full justify-start text-left font-normal h-10",
                           !date && "text-muted-foreground"
                         )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
                         {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
+                      </Button>
+                    </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(date) => date && setDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-          </div>
-          
-          {/* Note */}
-          <div className="grid gap-2">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={(date) => date && setDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {/* Note */}
+                <div className="grid gap-2">
                   <Label htmlFor="note" className="text-base font-medium">Note (optional)</Label>
-            <Textarea
-              id="note"
+                  <Textarea
+                    id="note"
                     placeholder="Add a note about this transaction"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-            />
-          </div>
-          
-          {/* Tags */}
-          <div className="grid gap-2">
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                
+                {/* Tags */}
+                <div className="grid gap-2">
                   <Label htmlFor="tags" className="text-base font-medium">Tags (optional)</Label>
-            <div className="relative">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="tags"
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="tags"
                       placeholder="Enter tags separated by commas"
                       className="pl-10"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-              />
+                      value={tags}
+                      onChange={(e) => setTags(e.target.value)}
+                    />
                   </div>
                   <p className="text-xs text-muted-foreground">Example: grocery, personal, vacation</p>
-            </div>
-          </div>
+                </div>
+              </div>
             )}
             
             {/* Navigation buttons */}
@@ -698,33 +773,97 @@ const TransactionForm = ({ accountId, onSuccess }: TransactionFormProps) => {
                   Next <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               ) : (
-          <Button 
-            type="submit" 
-            disabled={isSubmitting}
-                  className={cn(
-                    type === 'expense' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                <div className="flex gap-2 ml-auto">
+                  {existingTransaction && onDelete && (
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={() => setIsDeleteConfirmOpen(true)}
+                      className="px-3"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
+                      <span className={isMobile ? "hidden" : "inline"}>Delete</span>
+                    </Button>
                   )}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="animate-spin mr-2">
-                        <svg className="h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </span>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Transaction'
-                  )}
-          </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className={cn(
+                      type === 'expense' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                    )}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="animate-spin mr-2">
+                          <svg className="h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        </span>
+                        {existingTransaction ? 'Updating...' : 'Saving...'}
+                      </>
+                    ) : (
+                      existingTransaction ? 'Update Transaction' : 'Save Transaction'
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
-            
           </div>
         </form>
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Transaction</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="p-4 border rounded-md bg-muted/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{formatCurrency(Math.abs(existingTransaction?.amount || 0))}</p>
+                <p className="text-sm text-muted-foreground">
+                  {existingTransaction?.date && format(new Date(existingTransaction.date), "PPP")}
+                </p>
+              </div>
+              <Badge variant={type === 'expense' ? 'destructive' : 'default'} className={type === 'income' ? 'bg-green-500 text-white' : ''}>
+                {type === 'expense' ? 'Expense' : 'Income'}
+              </Badge>
+            </div>
+            {note && <p className="mt-2 text-sm">{note}</p>}
+          </div>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="animate-spin mr-2">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </span>
+                  Deleting...
+                </>
+              ) : (
+                'Delete Transaction'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

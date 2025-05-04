@@ -9,7 +9,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart 
 } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,10 +22,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   CalendarIcon, PiggyBank, Wallet, CreditCard, 
   BarChart2, LineChart as LineChartIcon, PieChart as PieChartIcon,
-  TrendingUp, TrendingDown, Calendar, Clock, ListFilter, Loader2
+  TrendingUp, TrendingDown, Calendar, Clock, ListFilter, Loader2,
+  Edit, Trash2, MoreVertical
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, addMonths, isWithinInterval, compareAsc } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Finance data types
 type FinancialAccount = Database['public']['Tables']['financial_accounts']['Row'];
@@ -122,21 +130,21 @@ const FinanceCalendar = ({ transactions, selectedMonth = new Date() }: {
   const daysOfWeek = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
 
   return (
-    <div className="bg-white rounded-md shadow-sm border">
+    <div className="bg-white rounded-md shadow-sm border overflow-x-auto">
       <div className="p-4 border-b">
         <h3 className="font-medium">{format(selectedMonth, 'MMMM yyyy')}</h3>
         <p className="text-sm text-muted-foreground">
           {transactionsByDay.reduce((sum, day) => sum + day.count, 0)} transactions
         </p>
       </div>
-      <div className="grid grid-cols-7 border-b">
+      <div className="grid grid-cols-7 border-b min-w-[350px]">
         {daysOfWeek.map((day, index) => (
           <div key={index} className="text-center py-2 text-sm font-medium text-muted-foreground">
             {day}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 min-w-[350px]">
         {/* Empty cells for days before the 1st of month */}
         {emptyCells.map((_, index) => (
           <div key={`empty-${index}`} className="aspect-square p-1 border-r border-b bg-muted/20"></div>
@@ -200,17 +208,17 @@ const TimePeriodHeader = ({
 }) => {
   return (
     <div className="mb-6">
-      <h2 className="text-2xl font-bold mb-2">{title}</h2>
+      <h2 className="text-xl sm:text-2xl font-bold mb-2">{title}</h2>
       <div className="text-sm text-muted-foreground mb-4">Financial summary for {period}</div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/30">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 pb-3 sm:pb-4 px-3 sm:px-6">
             <div className="flex justify-between items-center mb-1">
               <div className="text-sm font-medium text-green-800 dark:text-green-300">Income</div>
               <TrendingUp className="text-green-500 h-4 w-4" />
             </div>
-            <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+            <div className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-400">
               {income.toLocaleString('en-US', {
                 style: 'currency',
                 currency: 'THB'
@@ -220,12 +228,12 @@ const TimePeriodHeader = ({
         </Card>
         
         <Card className="bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 pb-3 sm:pb-4 px-3 sm:px-6">
             <div className="flex justify-between items-center mb-1">
               <div className="text-sm font-medium text-red-800 dark:text-red-300">Expenses</div>
               <TrendingDown className="text-red-500 h-4 w-4" />
             </div>
-            <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+            <div className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-400">
               {expense.toLocaleString('en-US', {
                 style: 'currency',
                 currency: 'THB'
@@ -238,7 +246,7 @@ const TimePeriodHeader = ({
           "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30" : 
           "bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-900/30"
         }>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 pb-3 sm:pb-4 px-3 sm:px-6">
             <div className="flex justify-between items-center mb-1">
               <div className="text-sm font-medium text-blue-800 dark:text-blue-300">Balance</div>
               {(income - expense) >= 0 ? 
@@ -246,7 +254,7 @@ const TimePeriodHeader = ({
                 <CreditCard className="text-orange-500 h-4 w-4" />
               }
             </div>
-            <div className={`text-2xl font-bold ${(income - expense) >= 0 ? 
+            <div className={`text-lg sm:text-2xl font-bold ${(income - expense) >= 0 ? 
               "text-blue-700 dark:text-blue-400" : 
               "text-orange-700 dark:text-orange-400"}`
             }>
@@ -344,6 +352,16 @@ const FinanceDataLoader = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Format currency globally
+const formatCurrency = (amount: number, currency = 'THB') => {
+  return new Intl.NumberFormat('th-TH', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
 // Finance content component
 const FinanceContent = () => {
   const { user } = useAuth();
@@ -361,6 +379,10 @@ const FinanceContent = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+  const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false);
+  const [isDeleteTransactionOpen, setIsDeleteTransactionOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // For monthly view
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -530,6 +552,56 @@ const FinanceContent = () => {
         variant: 'destructive' 
       });
     }
+  };
+
+  // Handle transaction deletion
+  const handleDeleteTransaction = async (id: string) => {
+    if (!id || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Refresh transactions
+      fetchAll(true);
+      
+      toast({
+        title: 'Success',
+        description: 'Transaction deleted successfully'
+      });
+      
+      // Close dialog if open
+      setIsDeleteTransactionOpen(false);
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete transaction',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Open edit transaction dialog
+  const openEditTransaction = (transaction: Transaction) => {
+    setCurrentTransaction(transaction);
+    setIsEditTransactionOpen(true);
+  };
+
+  // Open delete transaction dialog
+  const openDeleteTransaction = (transaction: Transaction) => {
+    setCurrentTransaction(transaction);
+    setIsDeleteTransactionOpen(true);
+  };
+
+  // Close transaction dialog
+  const closeTransactionDialog = () => {
+    setIsEditTransactionOpen(false);
+    setCurrentTransaction(null);
   };
 
   // Filter transactions by time period
@@ -833,45 +905,50 @@ const FinanceContent = () => {
   return (
     <>
       {/* Account Selection Header */}
-          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="account-select">Account:</Label>
-              <Select value={selectedAccountId || ''} onValueChange={setSelectedAccountId}>
-            <SelectTrigger className="min-w-[180px]" id="account-select">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((acc) => (
-                <SelectItem key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.currency})
-                </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button size="sm" variant="outline" onClick={() => setIsAddAccountOpen(true)}>
-                + New Account
-              </Button>
-          
-          <Button 
-            onClick={() => fetchAll(true)} 
-            variant="outline" 
-            size="sm"
-            disabled={isRefreshing}
-            className="ml-2"
-          >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <span className="flex items-center gap-1">
-                <span>↺</span>
-                <span>Refresh</span>
-              </span>
-            )}
-          </Button>
-            </div>
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="account-select">Account:</Label>
+            <Select value={selectedAccountId || ''} onValueChange={setSelectedAccountId}>
+              <SelectTrigger className="min-w-[150px] w-full sm:w-auto" id="account-select">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id}>
+                    {acc.name} ({acc.currency})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          
+          <div className="flex gap-2 self-start sm:self-auto mt-2 sm:mt-0">
+            <Button size="sm" variant="outline" onClick={() => setIsAddAccountOpen(true)} className="flex-1 sm:flex-auto">
+              + New Account
+            </Button>
+            
+            <Button 
+              onClick={() => fetchAll(true)} 
+              variant="outline" 
+              size="sm"
+              disabled={isRefreshing}
+              className="flex-1 sm:flex-auto"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <span className="flex items-center gap-1">
+                  <span>↺</span>
+                  <span>Refresh</span>
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-              {selectedAccountId && (
+      {selectedAccountId && (
         <>
           {/* Time Period Tabs */}
           <Tabs 
@@ -880,33 +957,34 @@ const FinanceContent = () => {
             onValueChange={(value) => setTimePeriod(value as TimePeriod)}
             className="mb-6"
           >
-            <div className="flex justify-between items-center mb-4">
-              <TabsList className="grid grid-cols-4">
-                <TabsTrigger value="overall" className="flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto gap-1">
+                <TabsTrigger value="overall" className="flex items-center justify-center gap-1.5 px-2">
                   <BarChart2 className="h-4 w-4" />
-                  <span>Overall</span>
+                  <span className="hidden sm:inline">Overall</span>
                 </TabsTrigger>
-                <TabsTrigger value="yearly" className="flex items-center gap-1.5">
+                <TabsTrigger value="yearly" className="flex items-center justify-center gap-1.5 px-2">
                   <LineChartIcon className="h-4 w-4" />
-                  <span>Yearly</span>
+                  <span className="hidden sm:inline">Yearly</span>
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="flex items-center gap-1.5">
+                <TabsTrigger value="monthly" className="flex items-center justify-center gap-1.5 px-2">
                   <Calendar className="h-4 w-4" />
-                  <span>Monthly</span>
+                  <span className="hidden sm:inline">Monthly</span>
                 </TabsTrigger>
-                <TabsTrigger value="weekly" className="flex items-center gap-1.5">
+                <TabsTrigger value="weekly" className="flex items-center justify-center gap-1.5 px-2">
                   <Clock className="h-4 w-4" />
-                  <span>Weekly</span>
+                  <span className="hidden sm:inline">Weekly</span>
                 </TabsTrigger>
               </TabsList>
               
               {/* Month navigation for Monthly view */}
               {timePeriod === 'monthly' && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 justify-center sm:justify-end">
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={goToPreviousMonth}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
                   >
                     Previous
                   </Button>
@@ -914,6 +992,7 @@ const FinanceContent = () => {
                     variant="outline"
                     size="sm"
                     onClick={goToCurrentMonth}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
                   >
                     Today
                   </Button>
@@ -921,6 +1000,7 @@ const FinanceContent = () => {
                     variant="outline" 
                     size="sm"
                     onClick={goToNextMonth}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
                   >
                     Next
                   </Button>
@@ -937,71 +1017,23 @@ const FinanceContent = () => {
             />
             
             {/* Tab Contents */}
-            <TabsContent value="overall" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
-                <Card>
-                    <CardHeader>
-                      <CardTitle>Income vs Expenses</CardTitle>
-                      <CardDescription>Monthly breakdown of all your finances</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-80">
-                        {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="name" />
-                              <YAxis tickFormatter={(value) => 
-                                value.toLocaleString('en-US', {
-                                  notation: 'compact',
-                                  compactDisplay: 'short',
-                                })
-                              } />
-                              <Tooltip 
-                                formatter={(value) => [formatCurrency(value as number), '']}
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                  borderRadius: '0.375rem',
-                                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-                                  border: '1px solid rgba(0, 0, 0, 0.05)'
-                                }}
-                              />
-                              <Legend />
-                              <Bar 
-                                dataKey="income" 
-                                name="Income" 
-                                fill="#10b981" 
-                                radius={[4, 4, 0, 0]}
-                                animationDuration={1000} 
-                              />
-                              <Bar 
-                                dataKey="expense" 
-                                name="Expenses" 
-                                fill="#ef4444" 
-                                radius={[4, 4, 0, 0]}
-                                animationDuration={1000} 
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            No data available
-                          </div>
-                        )}
-                      </div>
-                  </CardContent>
-                </Card>
-                </div>
-
-                <div className="lg:col-span-1">
-                  <Card className="h-full">
+            <TabsContent value="monthly" className="mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="lg:col-span-1 order-2 lg:order-1">
+                  <TransactionForm 
+                    accountId={selectedAccountId} 
+                    onSuccess={fetchAll} 
+                    existingTransaction={isEditTransactionOpen ? currentTransaction : null}
+                    onDelete={handleDeleteTransaction}
+                  />
+                  
+                  <Card className="mt-4 sm:mt-6">
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-center">
-                        <CardTitle>Categories</CardTitle>
+                        <CardTitle>Top Categories</CardTitle>
                         <div className="flex rounded-md overflow-hidden border">
                           <button 
-                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'expense' 
+                            className={`px-2 py-1 text-xs font-medium ${categoryDisplayType === 'expense' 
                               ? 'bg-red-500 text-white' 
                               : 'bg-background hover:bg-muted'}`}
                             onClick={() => setCategoryDisplayType('expense')}
@@ -1009,7 +1041,7 @@ const FinanceContent = () => {
                             Expense
                           </button>
                           <button 
-                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'income' 
+                            className={`px-2 py-1 text-xs font-medium ${categoryDisplayType === 'income' 
                               ? 'bg-green-500 text-white' 
                               : 'bg-background hover:bg-muted'}`}
                             onClick={() => setCategoryDisplayType('income')}
@@ -1018,73 +1050,113 @@ const FinanceContent = () => {
                           </button>
                         </div>
                       </div>
-                      <CardDescription>
-                        {categoryDisplayType === 'expense' ? 'Expense' : 'Income'} breakdown by category
-                      </CardDescription>
+                      <CardDescription>For {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 0 ? (
-                        <div className="space-y-6">
-                          <div className="h-48">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={40}
-                                  outerRadius={80}
-                                  paddingAngle={2}
-                                  dataKey="value"
-                                >
-                                  {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).map((entry, index) => (
-                                    <Cell 
-                                      key={`cell-${index}`} 
-                                      fill={entry.color || COLORS[index % COLORS.length]} 
-                                    />
-                                  ))}
-                                </Pie>
-                                <Tooltip
-                                  formatter={(value) => [formatCurrency(value as number), '']}
-                                  contentStyle={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                    borderRadius: '0.375rem',
-                                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-                                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                                  }}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).slice(0, 5).map((category, index) => (
-                              <div key={index} className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div 
-                                    className="w-3 h-3 rounded-full" 
-                                    style={{ backgroundColor: category.color || COLORS[index % COLORS.length] }}
-                                  ></div>
-                                  <span className="text-sm">{category.name}</span>
-                                </div>
-                                <div className="text-sm font-medium">
-                                  {formatCurrency(category.value)}
-                                </div>
+                        <div className="space-y-3">
+                          {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).slice(0, 6).map((category, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: category.color || COLORS[index % COLORS.length] }}
+                                ></div>
+                                <span className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-[150px]">{category.name}</span>
                               </div>
-                            ))}
-                            
-                            {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 5 && (
-                              <div className="text-sm text-center text-muted-foreground pt-2">
-                                + {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length - 5} more categories
+                              <div className="text-xs sm:text-sm font-medium">
+                                {formatCurrency(category.value)}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center h-64 text-muted-foreground">
+                        <div className="flex items-center justify-center h-32 text-muted-foreground">
                           No {categoryDisplayType} data available
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="lg:col-span-2 order-1 lg:order-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Calendar View</CardTitle>
+                      <CardDescription>Transactions for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FinanceCalendar 
+                        transactions={filteredTransactions} 
+                        selectedMonth={selectedMonth} 
+                      />
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="mt-4 sm:mt-6">
+                    <CardHeader>
+                      <CardTitle>Recent Transactions</CardTitle>
+                      <CardDescription>Latest activity for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                        {filteredTransactions.slice(0, 8).map((transaction) => (
+                          <div key={transaction.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0 group relative">
+                            <div className="flex-grow pr-10">
+                              <div className="font-medium capitalize flex items-center gap-1.5 text-sm">
+                                {transaction.transaction_categories?.icon && (
+                                  <span style={{ color: transaction.transaction_categories.color || undefined }}>
+                                    {transaction.transaction_categories.icon}
+                                  </span>
+                                )}
+                                {transaction.transaction_categories?.name || 'Other'}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(transaction.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                              </div>
+                              {transaction.note && (
+                                <div className="text-xs text-muted-foreground mt-1 truncate max-w-[150px] sm:max-w-none">
+                                  {transaction.note}
+                                </div>
+                              )}
+                            </div>
+                            <div className={`font-medium text-sm ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                              {transaction.type === 'income' ? '+' : '-'} {formatCurrency(Math.abs(transaction.amount))}
+                            </div>
+                            
+                            {/* Action menu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditTransaction(transaction)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => openDeleteTransaction(transaction)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        ))}
+                        {filteredTransactions.length === 0 && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            No transactions found
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -1230,119 +1302,6 @@ const FinanceContent = () => {
               </div>
             </TabsContent>
             
-            <TabsContent value="monthly" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 order-2 lg:order-1">
-                  <TransactionForm accountId={selectedAccountId} onSuccess={fetchAll} />
-                  
-                  <Card className="mt-6">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-center">
-                        <CardTitle>Top Categories</CardTitle>
-                        <div className="flex rounded-md overflow-hidden border">
-                          <button 
-                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'expense' 
-                              ? 'bg-red-500 text-white' 
-                              : 'bg-background hover:bg-muted'}`}
-                            onClick={() => setCategoryDisplayType('expense')}
-                          >
-                            Expense
-                          </button>
-                          <button 
-                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'income' 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-background hover:bg-muted'}`}
-                            onClick={() => setCategoryDisplayType('income')}
-                          >
-                            Income
-                          </button>
-                        </div>
-                      </div>
-                      <CardDescription>For {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 0 ? (
-                        <div className="space-y-3">
-                          {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).slice(0, 6).map((category, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-3 h-3 rounded-full" 
-                                  style={{ backgroundColor: category.color || COLORS[index % COLORS.length] }}
-                                ></div>
-                                <span className="text-sm">{category.name}</span>
-                              </div>
-                              <div className="text-sm font-medium">
-                                {formatCurrency(category.value)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-32 text-muted-foreground">
-                          No {categoryDisplayType} data available
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-                
-                <div className="lg:col-span-2 order-1 lg:order-2">
-              <Card>
-                    <CardHeader>
-                      <CardTitle>Calendar View</CardTitle>
-                      <CardDescription>Transactions for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <FinanceCalendar 
-                        transactions={filteredTransactions} 
-                        selectedMonth={selectedMonth} 
-                      />
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Recent Transactions</CardTitle>
-                      <CardDescription>Latest activity for {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                      <div className="space-y-4 max-h-[300px] overflow-y-auto">
-                        {filteredTransactions.slice(0, 8).map((transaction) => (
-                      <div key={transaction.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                        <div>
-                          <div className="font-medium capitalize flex items-center gap-1.5">
-                            {transaction.transaction_categories?.icon && (
-                              <span style={{ color: transaction.transaction_categories.color || undefined }}>
-                                {transaction.transaction_categories.icon}
-                              </span>
-                            )}
-                            {transaction.transaction_categories?.name || 'Other'}
-                          </div>
-                              <div className="text-sm text-muted-foreground">
-                                {new Date(transaction.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                        </div>
-                              {transaction.note && (
-                                <div className="text-xs text-muted-foreground mt-1">{transaction.note}</div>
-                              )}
-                            </div>
-                            <div className={`font-medium ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
-                              {transaction.type === 'income' ? '+' : '-'} {formatCurrency(Math.abs(transaction.amount))}
-                            </div>
-                      </div>
-                    ))}
-                        {filteredTransactions.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No transactions found
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-            </TabsContent>
-
             <TabsContent value="weekly" className="mt-4">
               <div className="grid grid-cols-1 gap-6">
             <Card>
@@ -1489,6 +1448,80 @@ const FinanceContent = () => {
               </form>
             </DialogContent>
           </Dialog>
+          
+          {/* Edit Transaction Dialog */}
+          <Dialog 
+            open={isEditTransactionOpen} 
+            onOpenChange={(open) => {
+              if (!open) closeTransactionDialog();
+              else setIsEditTransactionOpen(open);
+            }}
+          >
+            <DialogContent className="sm:max-w-[600px] p-0">
+              {currentTransaction && (
+                <TransactionForm 
+                  accountId={selectedAccountId || ''} 
+                  onSuccess={() => {
+                    fetchAll(true);
+                    closeTransactionDialog();
+                  }}
+                  existingTransaction={currentTransaction}
+                  onDelete={handleDeleteTransaction}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+          
+          {/* Delete Transaction Dialog */}
+          <Dialog open={isDeleteTransactionOpen} onOpenChange={setIsDeleteTransactionOpen}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>Delete Transaction</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete this transaction? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {currentTransaction && (
+                <div className="p-4 border rounded-md bg-muted/50 my-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{formatCurrency(Math.abs(currentTransaction.amount))}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(currentTransaction.date), "PPP")}
+                      </p>
+                      <p className="text-sm mt-1">
+                        {currentTransaction.transaction_categories?.name || 'Uncategorized'}
+                      </p>
+                    </div>
+                    <Badge 
+                      variant={currentTransaction.type === 'expense' ? 'destructive' : 'default'}
+                      className={currentTransaction.type === 'income' ? 'bg-green-500 text-white' : ''}
+                    >
+                      {currentTransaction.type === 'expense' ? 'Expense' : 'Income'}
+                    </Badge>
+                  </div>
+                  {currentTransaction.note && (
+                    <p className="mt-2 text-sm border-t pt-2">{currentTransaction.note}</p>
+                  )}
+                </div>
+              )}
+              
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsDeleteTransactionOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    if (currentTransaction) handleDeleteTransaction(currentTransaction.id);
+                  }}
+                >
+                  Delete Transaction
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
     </>
   );
 };
@@ -1500,9 +1533,9 @@ const FinancePage = () => {
       <main className="flex-1">
         <PageContainer title="Finance Tracker">
           <Suspense fallback={
-            <div className="grid grid-cols-1 gap-6 mb-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6">
               <div className="h-12 bg-muted animate-pulse rounded-lg"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {[1, 2, 3].map((i) => (
                   <Card key={i} className="overflow-hidden">
                     <CardHeader className="pb-2">

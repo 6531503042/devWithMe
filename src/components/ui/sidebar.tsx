@@ -20,7 +20,7 @@ import {
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
+const SIDEBAR_WIDTH_MOBILE = "85vw"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
@@ -110,6 +110,48 @@ const SidebarProvider = React.forwardRef<
       return () => window.removeEventListener("keydown", handleKeyDown)
     }, [toggleSidebar])
 
+    // In SidebarProvider component, add touch gesture support
+    React.useEffect(() => {
+      // Only add touch gesture support on mobile
+      if (!isMobile) return;
+      
+      let startX = 0;
+      let currentX = 0;
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        startX = e.touches[0].clientX;
+        currentX = startX;
+      };
+      
+      const handleTouchMove = (e: TouchEvent) => {
+        currentX = e.touches[0].clientX;
+      };
+      
+      const handleTouchEnd = () => {
+        const THRESHOLD = 100; // Minimum swipe distance to trigger
+        
+        // Right to left swipe (close sidebar)
+        if (startX - currentX > THRESHOLD && openMobile) {
+          setOpenMobile(false);
+        }
+        
+        // Left to right swipe (open sidebar)
+        if (currentX - startX > THRESHOLD && !openMobile) {
+          setOpenMobile(true);
+        }
+      };
+      
+      document.addEventListener('touchstart', handleTouchStart);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }, [isMobile, openMobile, setOpenMobile]);
+
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed"
@@ -196,7 +238,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:right-4 [&>button]:top-4"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -204,7 +246,19 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="flex h-full w-full flex-col pt-12">
+              <div className="absolute top-4 left-4 flex items-center gap-2 h-8">
+                <div className="h-6 w-6 text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M16 12h-8"/>
+                    <path d="M12 8v8"/>
+                  </svg>
+                </div>
+                <span className="font-semibold text-lg">Menu</span>
+              </div>
+              {children}
+            </div>
           </SheetContent>
         </Sheet>
       )
