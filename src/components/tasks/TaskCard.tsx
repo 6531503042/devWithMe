@@ -21,10 +21,19 @@ import {
   Tag,
   X,
   AlertCircle,
-  Target
+  Target,
+  Trash2,
+  MoreVertical,
+  Edit
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 // Define category with icon mapping for consistency with TaskForm
 interface CategoryWithIcon {
@@ -89,6 +98,8 @@ interface TaskCardProps {
   onNumericUpdate?: (id: string, value: number) => void;
   onTimerUpdate?: (id: string, elapsed: number) => void;
   onChecklistUpdate?: (id: string, itemId: string, done: boolean) => void;
+  onDelete?: (id: string) => void;
+  onEdit?: (task: Task) => void;
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({
@@ -96,7 +107,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
   onComplete,
   onNumericUpdate,
   onTimerUpdate,
-  onChecklistUpdate
+  onChecklistUpdate,
+  onDelete,
+  onEdit
 }) => {
   const hasTracking = 
     (task.numeric_goal_target !== null) ||
@@ -207,6 +220,36 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 </span>
                   )}
                 </Badge>
+                
+                {/* Actions menu */}
+                {(onDelete || onEdit) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {onEdit && (
+                        <DropdownMenuItem 
+                          onClick={() => onEdit(task)}
+                        >
+                          <Edit className="h-3.5 w-3.5 mr-2" />
+                          Edit Task
+                        </DropdownMenuItem>
+                      )}
+                      {onDelete && (
+                        <DropdownMenuItem 
+                          className="text-red-600 focus:text-red-600"
+                          onClick={() => onDelete(task.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" />
+                          Delete Task
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
             

@@ -96,6 +96,7 @@ const TasksPage = () => {
   const [viewOption, setViewOption] = useState<'board' | 'list'>('board');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'dueDate'>('newest');
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const { user } = useAuth();
   
   // Fetch tasks from Supabase for the current authenticated user
@@ -351,12 +352,63 @@ const TasksPage = () => {
     }
   });
   
+  // Delete task
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
+      // First delete associated checklist items if any
+      const { error: checklistError } = await supabase
+        .from('task_checklist_items')
+        .delete()
+        .eq('task_id', id);
+      
+      if (checklistError) {
+        console.error('Error deleting checklist items:', checklistError);
+      }
+      
+      // Then delete the task
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
+      toast({
+        title: "Task deleted",
+        description: "The task has been permanently deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete task",
+        description: error.message,
+      });
+    }
+  });
+  
   const handleTaskComplete = (id: string, completed: boolean) => {
     updateTaskMutation.mutate({ id, completed });
   };
   
   const handleAddTask = (newTask: Task) => {
     addTaskMutation.mutate(newTask as Omit<Task, 'id'>);
+  };
+  
+  const handleEditTask = (task: Task) => {
+    setTaskToEdit(task);
+    setIsFormOpen(true);
+  };
+  
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    setTaskToEdit(null);
   };
   
   const handleNumericUpdate = (id: string, value: number) => {
@@ -369,6 +421,12 @@ const TasksPage = () => {
   
   const handleChecklistUpdate = (id: string, itemId: string, done: boolean) => {
     updateChecklistMutation.mutate({ taskId: id, itemId, done });
+  };
+  
+  const handleDeleteTask = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
+      deleteTaskMutation.mutate(id);
+    }
   };
 
   // Derived stats for dashboard
@@ -681,6 +739,8 @@ const TasksPage = () => {
                   onNumericUpdate={handleNumericUpdate}
                   onTimerUpdate={handleTimerUpdate}
                   onChecklistUpdate={handleChecklistUpdate}
+                  onDelete={handleDeleteTask}
+                  onEdit={handleEditTask}
                 />
               ))}
             </div>
@@ -694,6 +754,8 @@ const TasksPage = () => {
                   onNumericUpdate={handleNumericUpdate}
                   onTimerUpdate={handleTimerUpdate}
                   onChecklistUpdate={handleChecklistUpdate}
+                  onDelete={handleDeleteTask}
+                  onEdit={handleEditTask}
                 />
               ))}
             </div>
@@ -702,8 +764,10 @@ const TasksPage = () => {
           {/* Task Form */}
           <TaskForm
             open={isFormOpen}
-            onOpenChange={setIsFormOpen}
+            onOpenChange={handleCloseForm}
             onSubmit={handleAddTask}
+            existingTask={taskToEdit}
+            onDelete={handleDeleteTask}
           />
         </PageContainer>
       </main>

@@ -745,6 +745,33 @@ const FinanceContent = () => {
       .sort((a, b) => b.value - a.value);
   }, [filteredTransactions]);
 
+  // NEW: Add income category breakdown
+  const incomeCategoryBreakdown = useMemo(() => {
+    const categoryMap: Record<string, { amount: number, color: string }> = {};
+    
+    // Get only income transactions
+    const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
+    
+    incomeTransactions.forEach(transaction => {
+      const categoryName = transaction.transaction_categories?.name || 'Other Income';
+      const categoryColor = transaction.transaction_categories?.color || COLORS[2];
+      
+      if (!categoryMap[categoryName]) {
+        categoryMap[categoryName] = { amount: 0, color: categoryColor };
+      }
+      
+      categoryMap[categoryName].amount += Math.abs(transaction.amount);
+    });
+    
+    // Convert to array and sort by amount (descending)
+    return Object.entries(categoryMap)
+      .map(([name, { amount, color }]) => ({ name, value: amount, color }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTransactions]);
+
+  // NEW: Add state for category display type
+  const [categoryDisplayType, setCategoryDisplayType] = useState<'expense' | 'income'>('expense');
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('th-TH', {
@@ -969,18 +996,40 @@ const FinanceContent = () => {
 
                 <div className="lg:col-span-1">
                   <Card className="h-full">
-                    <CardHeader>
-                      <CardTitle>Categories</CardTitle>
-                      <CardDescription>Expense breakdown by category</CardDescription>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle>Categories</CardTitle>
+                        <div className="flex rounded-md overflow-hidden border">
+                          <button 
+                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'expense' 
+                              ? 'bg-red-500 text-white' 
+                              : 'bg-background hover:bg-muted'}`}
+                            onClick={() => setCategoryDisplayType('expense')}
+                          >
+                            Expense
+                          </button>
+                          <button 
+                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'income' 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-background hover:bg-muted'}`}
+                            onClick={() => setCategoryDisplayType('income')}
+                          >
+                            Income
+                          </button>
+                        </div>
+                      </div>
+                      <CardDescription>
+                        {categoryDisplayType === 'expense' ? 'Expense' : 'Income'} breakdown by category
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {categoryBreakdown.length > 0 ? (
+                      {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 0 ? (
                         <div className="space-y-6">
                           <div className="h-48">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie
-                                  data={categoryBreakdown}
+                                  data={categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown}
                                   cx="50%"
                                   cy="50%"
                                   innerRadius={40}
@@ -988,7 +1037,7 @@ const FinanceContent = () => {
                                   paddingAngle={2}
                                   dataKey="value"
                                 >
-                                  {categoryBreakdown.map((entry, index) => (
+                                  {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).map((entry, index) => (
                                     <Cell 
                                       key={`cell-${index}`} 
                                       fill={entry.color || COLORS[index % COLORS.length]} 
@@ -1009,7 +1058,7 @@ const FinanceContent = () => {
                           </div>
                           
                           <div className="space-y-3">
-                            {categoryBreakdown.slice(0, 5).map((category, index) => (
+                            {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).slice(0, 5).map((category, index) => (
                               <div key={index} className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <div 
@@ -1024,16 +1073,16 @@ const FinanceContent = () => {
                               </div>
                             ))}
                             
-                            {categoryBreakdown.length > 5 && (
+                            {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 5 && (
                               <div className="text-sm text-center text-muted-foreground pt-2">
-                                + {categoryBreakdown.length - 5} more categories
+                                + {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length - 5} more categories
                               </div>
                             )}
                           </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-center h-64 text-muted-foreground">
-                          No expense data available
+                          No {categoryDisplayType} data available
                         </div>
                       )}
                     </CardContent>
@@ -1187,14 +1236,34 @@ const FinanceContent = () => {
                   <TransactionForm accountId={selectedAccountId} onSuccess={fetchAll} />
                   
                   <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle>Top Categories</CardTitle>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle>Top Categories</CardTitle>
+                        <div className="flex rounded-md overflow-hidden border">
+                          <button 
+                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'expense' 
+                              ? 'bg-red-500 text-white' 
+                              : 'bg-background hover:bg-muted'}`}
+                            onClick={() => setCategoryDisplayType('expense')}
+                          >
+                            Expense
+                          </button>
+                          <button 
+                            className={`px-2.5 py-1 text-xs font-medium ${categoryDisplayType === 'income' 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-background hover:bg-muted'}`}
+                            onClick={() => setCategoryDisplayType('income')}
+                          >
+                            Income
+                          </button>
+                        </div>
+                      </div>
                       <CardDescription>For {format(selectedMonth, 'MMMM yyyy')}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {categoryBreakdown.length > 0 ? (
+                      {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).length > 0 ? (
                         <div className="space-y-3">
-                          {categoryBreakdown.slice(0, 6).map((category, index) => (
+                          {(categoryDisplayType === 'expense' ? categoryBreakdown : incomeCategoryBreakdown).slice(0, 6).map((category, index) => (
                             <div key={index} className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <div 
@@ -1211,7 +1280,7 @@ const FinanceContent = () => {
                         </div>
                       ) : (
                         <div className="flex items-center justify-center h-32 text-muted-foreground">
-                          No expense data available
+                          No {categoryDisplayType} data available
                         </div>
                       )}
                     </CardContent>

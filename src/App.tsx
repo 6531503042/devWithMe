@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { lazy, Suspense } from "react";
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 // Loader component
 const PageLoader = () => (
@@ -14,48 +15,54 @@ const PageLoader = () => (
 );
 
 // Lazy-loaded Pages
-const Index = lazy(() => import("./pages/Index"));
-const PomodoroPage = lazy(() => import("./pages/PomodoroPage"));
-const TasksPage = lazy(() => import("./pages/TasksPage"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const FinancePage = lazy(() => import("./pages/FinancePage"));
-const KanbanPage = lazy(() => import("./pages/KanbanPage"));
-const AuthPage = lazy(() => import("./pages/AuthPage"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Index = lazy(() => import("@/pages/Index"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const TasksPage = lazy(() => import("@/pages/TasksPage"));
+const KanbanPage = lazy(() => import("@/pages/KanbanPage"));
+const PomodoroPage = lazy(() => import("@/pages/PomodoroPage"));
+const FinancePage = lazy(() => import("@/pages/FinancePage"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const SpotifyCallback = lazy(() => import("@/pages/SpotifyCallback"));
 
-// Configure QueryClient with caching and retry policies
+// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (garbage collection time)
+      staleTime: 1000 * 60 * 5, // 5 minutes
       retry: 1,
-      refetchOnWindowFocus: false
-    }
-  }
+    },
+  },
 });
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
         <AuthProvider>
           <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/pomodoro" element={<PomodoroPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/finance" element={<FinancePage />} />
-            <Route path="/kanban" element={<KanbanPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/spotify-callback" element={<SpotifyCallback />} />
+              
+              {/* Protected routes */}
+              <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+              <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+              <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
+              <Route path="/pomodoro" element={<ProtectedRoute><PomodoroPage /></ProtectedRoute>} />
+              <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
+              
+              {/* Not found */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </Suspense>
         </AuthProvider>
       </BrowserRouter>
+      
+      <Toaster />
+      <Sonner position="top-right" />
     </TooltipProvider>
   </QueryClientProvider>
 );

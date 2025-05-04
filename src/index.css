@@ -211,3 +211,16 @@
     }
   }
 }
+
+@keyframes bounceX {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+
+.animate-bounceX {
+  animation: bounceX 1s ease-in-out infinite;
+}
