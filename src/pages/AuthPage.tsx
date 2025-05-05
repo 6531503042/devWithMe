@@ -209,7 +209,7 @@ const AuthPage = () => {
       {/* Hero Header */}
       <header className="container mx-auto pt-10 pb-6 text-center">
         <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-          SparkHub
+          devWithMe
         </h1>
         <p className="text-lg mt-2 text-muted-foreground max-w-xl mx-auto">
           Your all-in-one productivity solution for getting more done
